@@ -1,5 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.db.models import Joueur, Personnage
 from app.dependencies.joueur import get_current_joueur
 from app.core.database import get_db
