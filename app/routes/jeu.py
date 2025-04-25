@@ -1,78 +1,60 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
-from random import randint
+
+from app.schemas.jeu import JetDesRequest, ModificateurRequest, SauvegardeRequest, CaracCheckRequest, ChanceRequest
+from app.services.jeu_service import JeuService # Import du service
 
 router = APIRouter(prefix="/jeu", tags=["jeu"])
 
-class JetDesRequest(BaseModel):
-    type_de: Literal["d4", "d6", "d8", "d10", "d12", "d20", "d100"]
-    nombre: int = Field(default=1, ge=1, le=100)
-    modificateur: Optional[int] = 0
-
-class ModificateurRequest(BaseModel):
-    modificateur: int = 0
-
-class SauvegardeRequest(BaseModel):
-    seuil: int
-    modificateur: int = 0
-
-class CaracCheckRequest(BaseModel):
-    seuil: int
-    modificateur: int = 0
-
-class ChanceRequest(BaseModel):
-    seuil: int = 1
-
-
-def roll_dice(nb: int, faces: int, mod: int = 0):
-    resultats = [randint(1, faces) for _ in range(nb)]
-    total = sum(resultats) + mod
-    return {"dés": resultats, "modificateur": mod, "total": total}
+# Dépendance pour obtenir le JeuService
+def get_jeu_service() -> JeuService:
+    return JeuService()
 
 @router.post("/jet-de")
-def jet_de(request: JetDesRequest):
-    faces = int(request.type_de[1:])
-    return roll_dice(request.nombre, faces, request.modificateur)
+def jet_de(
+    request: JetDesRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_de(request)
 
 @router.post("/attaque")
-def jet_attaque(data: ModificateurRequest):
-    return roll_dice(1, 20, data.modificateur)
+def jet_attaque(
+    data: ModificateurRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_attaque(data)
 
 @router.post("/initiative")
-def jet_initiative():
-    return roll_dice(1, 6)
+def jet_initiative(
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_initiative()
 
 @router.post("/sauvegarde")
-def jet_sauvegarde(data: SauvegardeRequest):
-    jet = randint(1, 20)
-    total = jet + data.modificateur
-    return {
-        "jet": jet,
-        "modificateur": data.modificateur,
-        "total": total,
-        "réussi": total >= data.seuil
-    }
+def jet_sauvegarde(
+    data: SauvegardeRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_sauvegarde(data)
 
 @router.post("/moral")
-def jet_moral(data: ModificateurRequest):
-    return roll_dice(2, 6, data.modificateur)
+def jet_moral(
+    data: ModificateurRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_moral(data)
 
 @router.post("/caracteristique")
-def test_caracteristique(data: CaracCheckRequest):
-    jet = randint(1, 20)
-    total = jet + data.modificateur
-    return {
-        "jet": jet,
-        "modificateur": data.modificateur,
-        "total": total,
-        "réussi": total <= data.seuil
-    }
+def test_caracteristique(
+    data: CaracCheckRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.test_caracteristique(data)
 
 @router.post("/chance")
-def jet_chance(data: ChanceRequest):
-    jet = randint(1, 6)
-    return {
-        "jet": jet,
-        "réussi": jet <= data.seuil
-    }
+def jet_chance(
+    data: ChanceRequest,
+    jeu_service: JeuService = Depends(get_jeu_service) # Injection du service
+):
+    return jeu_service.jet_chance(data)

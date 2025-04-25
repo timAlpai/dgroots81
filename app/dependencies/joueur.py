@@ -13,7 +13,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/joueur/login")
 
 async def get_current_joueur(
     token: str = Depends(oauth2_scheme),
-
     db: AsyncSession = Depends(get_db),
 ) -> Joueur:
     try:
@@ -22,7 +21,9 @@ async def get_current_joueur(
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
 
-    joueur = await db.get(Joueur, token_data.sub)
+    joueur_service = JoueurService(db)
+    joueur = await joueur_service.get_joueur_by_id(token_data.sub)
+
     if not joueur:
         raise HTTPException(status_code=404, detail="Joueur introuvable")
     if not joueur.is_active:

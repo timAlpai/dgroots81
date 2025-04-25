@@ -1,46 +1,37 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from app.core.database import get_db
-from app.db.models.user import User
 from app.schemas.user import UserCreate, UserOut
-from passlib.context import CryptContext
-from app.core.security import verify_password, create_access_token
 from app.schemas.token import Token
-from sqlalchemy.future import select
+from app.services.auth_service import AuthService # Import du service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_password_hash(password: str):
-    return pwd_context.hash(password)
+# Dépendance pour obtenir l'AuthService
+async def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
+    return AuthService(db)
 
 @router.post("/register", response_model=UserOut)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == user.email))
-    existing_user = result.scalar_one_or_none()
-    if existing_user:
+async def register(
+    user_data: UserCreate,
+    auth_service: AuthService = Depends(get_auth_service) # Injection du service
+):
+    new_user = await auth_service.create_user(user_data)
+    if new_user is None:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    new_user = User(
-        email=user.email,
-        password_hash=get_password_hash(user.password),
-        credit_balance=0
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
     return new_user
 
 
 @router.post("/login", response_model=Token)
-async def login(form: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == form.email))
-    user = result.scalar_one_or_none()
-    if not user or not verify_password(form.password, user.password_hash):
+async def login(
+    form_data: UserCreate, # Renommé pour clarté, bien que le schéma soit UserCreate
+    auth_service: AuthService = Depends(get_auth_service) # Injection du service
+):
+    user = await auth_service.authenticate_user(form_data.email, form_data.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    token = create_access_token(data={"sub": str(user.id)})
+
+    token = auth_service.create_access_token_for_user(user.id)
     return {"access_token": token, "token_type": "bearer"}
