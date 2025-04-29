@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rpg-ia-backend
+  labels:
+    app: rpg-ia-backend
+spec:
+  selector:
+    app: rpg-ia-backend
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP

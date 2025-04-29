@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     env: str = "development"
     secret_key: str
+    OPENROUTER_API_KEY: str
+    OPENAI_API_KEY: str
     algorithm: str 
     postgres_host: str
     postgres_port: int
