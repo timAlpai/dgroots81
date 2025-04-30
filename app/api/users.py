@@ -192,3 +192,20 @@ async def delete_user(
     await db.commit()
     
     return None
+
+@router.get("/check-exists/{username}", status_code=status.HTTP_200_OK)
+async def check_user_exists(
+   username: str,
+   db: AsyncSession = Depends(get_db)
+):
+   """
+   Vérifie si un utilisateur existe par son nom d'utilisateur.
+   Cet endpoint est principalement utilisé pour les tests.
+   """
+   result = await db.execute(select(User).filter(User.username == username))
+   user = result.scalars().first()
+   
+   if user is None:
+       return {"exists": False}
+   
+   return {"exists": True}

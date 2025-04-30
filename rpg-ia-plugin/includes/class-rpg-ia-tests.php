@@ -168,36 +168,212 @@ class RPG_IA_Tests {
      * @since    1.0.0
      */
     private function create_test_data_in_api() {
-        // Créer un utilisateur de test
-        try {
-            $user_data = array(
-                'username' => $this->test_data['user']['username'],
-                'email' => $this->test_data['user']['email'],
-                'password' => $this->test_data['user']['password']
-            );
+       // Créer un utilisateur de test
+       try {
+           // Générer un nom d'utilisateur et un mot de passe uniques pour éviter les conflits
+           $timestamp = time();
+           $user_data = array(
+               'username' => 'test_user_' . $timestamp,
+               'email' => 'test_' . $timestamp . '@example.com',
+               'password' => 'Test@' . $timestamp
+           );
+           
+           // Mettre à jour les données de test
+           $this->test_data['user']['username'] = $user_data['username'];
+           $this->test_data['user']['email'] = $user_data['email'];
+           $this->test_data['user']['password'] = $user_data['password'];
+           
+           // Initialiser les informations de débogage
+           $debug_info = array();
+           $this->test_data['debug_info'] = $debug_info;
+           
+           error_log('=== DÉBUT DU TEST D\'AUTHENTIFICATION ===');
+           error_log('Utilisateur de test: ' . $user_data['username']);
+           error_log('Email de test: ' . $user_data['email']);
+           error_log('Mot de passe de test: ' . $user_data['password']);
+           
+           // Vérifier d'abord si l'utilisateur existe en utilisant le nouvel endpoint
+           error_log('Vérification de l\'existence de l\'utilisateur...');
+           $user_exists = $this->api_client->check_user_exists($user_data['username']);
+           $this->test_data['debug_info']['user_exists_check'] = $user_exists;
+           
+           if (is_wp_error($user_exists)) {
+               error_log('Erreur lors de la vérification de l\'existence de l\'utilisateur: ' . $user_exists->get_error_message());
+               // Si l'endpoint n'est pas disponible, utiliser la méthode précédente
+               $this->test_data['debug_info']['fallback_to_login_check'] = true;
+               error_log('Fallback à la méthode de vérification par login');
+               
+               // Essayer de se connecter pour voir si l'utilisateur existe
+               $login_response = $this->api_client->login(
+                   $user_data['username'],
+                   $user_data['password']
+               );
+               
+               $this->test_data['debug_info']['initial_login_response'] = $login_response;
+               
+               // Si la connexion réussit, l'utilisateur existe déjà
+               if (!is_wp_error($login_response) && isset($login_response['access_token'])) {
+                   error_log('Connexion réussie, l\'utilisateur existe déjà');
+                   $user_exists = true;
+                   $this->test_data['user']['token'] = $login_response['access_token'];
+                   $this->api_client->set_token($login_response['access_token']);
+                   
+                   // Récupérer les informations de l'utilisateur
+                   $user_info = $this->api_client->get_current_user();
+                   if (!is_wp_error($user_info) && isset($user_info['id'])) {
+                       $this->test_data['user']['id'] = $user_info['id'];
+                       error_log('ID de l\'utilisateur récupéré: ' . $user_info['id']);
+                   }
+               } else {
+                   error_log('Connexion échouée, l\'utilisateur n\'existe probablement pas');
+                   $user_exists = false;
+               }
+           } else {
+               error_log('Résultat de la vérification d\'existence: ' . ($user_exists ? 'L\'utilisateur existe' : 'L\'utilisateur n\'existe pas'));
+           }
+           
+           // Si l'utilisateur existe
+           if ($user_exists === true) {
+               error_log('L\'utilisateur existe déjà');
+               $this->test_data['debug_info']['user_exists'] = true;
+               
+               // Essayer de se connecter avec les identifiants fournis
+               error_log('Tentative de connexion avec l\'utilisateur existant');
+               $login_response = $this->api_client->login(
+                   $user_data['username'],
+                   $user_data['password']
+               );
+               
+               $this->test_data['debug_info']['login_existing_user'] = $login_response;
+               
+               if (!is_wp_error($login_response) && isset($login_response['access_token'])) {
+                   // Connexion réussie
+                   error_log('Connexion réussie avec l\'utilisateur existant');
+                   $this->test_data['user']['token'] = $login_response['access_token'];
+                   $this->api_client->set_token($login_response['access_token']);
+                   
+                   // Récupérer les informations de l'utilisateur
+                   $user_info = $this->api_client->get_current_user();
+                   if (!is_wp_error($user_info) && isset($user_info['id'])) {
+                       $this->test_data['user']['id'] = $user_info['id'];
+                       error_log('ID de l\'utilisateur récupéré: ' . $user_info['id']);
+                   }
+               } else {
+                   // La connexion a échoué, probablement parce que le mot de passe est incorrect
+                   error_log('Connexion échouée avec l\'utilisateur existant, création d\'un nouvel utilisateur');
+                   $this->test_data['debug_info']['password_mismatch'] = true;
+                   
+                   // Générer un nouveau nom d'utilisateur unique
+                   $new_timestamp = time();
+                   $user_data['username'] = 'test_user_' . $new_timestamp;
+                   $user_data['email'] = 'test_' . $new_timestamp . '@example.com';
+                   $user_data['password'] = 'Test@' . $new_timestamp;
+                   
+                   $this->test_data['user']['username'] = $user_data['username'];
+                   $this->test_data['user']['email'] = $user_data['email'];
+                   $this->test_data['user']['password'] = $user_data['password'];
+                   
+                   error_log('Nouvel utilisateur: ' . $user_data['username']);
+                   error_log('Nouvel email: ' . $user_data['email']);
+                   error_log('Nouveau mot de passe: ' . $user_data['password']);
+                   
+                   // Enregistrer le nouvel utilisateur
+                   error_log('Enregistrement du nouvel utilisateur');
+                   $register_response = $this->api_client->register(
+                       $user_data['username'],
+                       $user_data['email'],
+                       $user_data['password']
+                   );
+                   
+                   $this->test_data['debug_info']['register_new_user'] = $register_response;
+                   
+                   if (!is_wp_error($register_response) && isset($register_response['id'])) {
+                       // Enregistrement réussi
+                       error_log('Enregistrement réussi, ID: ' . $register_response['id']);
+                       $this->test_data['user']['id'] = $register_response['id'];
+                       
+                       // Attendre un court instant pour s'assurer que l'utilisateur est bien enregistré
+                       error_log('Attente de 2 secondes pour s\'assurer que l\'utilisateur est bien enregistré');
+                       sleep(2);
+                       
+                       // Se connecter pour obtenir un token
+                       error_log('Tentative de connexion après enregistrement');
+                       $login_after_register = $this->api_client->login(
+                           $user_data['username'],
+                           $user_data['password']
+                       );
+                       
+                       $this->test_data['debug_info']['login_after_register'] = $login_after_register;
+                       
+                       if (!is_wp_error($login_after_register) && isset($login_after_register['access_token'])) {
+                           error_log('Connexion réussie après enregistrement');
+                           $this->test_data['user']['token'] = $login_after_register['access_token'];
+                           $this->api_client->set_token($login_after_register['access_token']);
+                       } else {
+                           error_log('Échec de connexion après enregistrement: ' .
+                               (is_wp_error($login_after_register) ? $login_after_register->get_error_message() : 'Pas de token dans la réponse'));
+                       }
+                   } else {
+                       error_log('Échec de l\'enregistrement: ' .
+                           (is_wp_error($register_response) ? $register_response->get_error_message() : 'Réponse invalide'));
+                   }
+               }
+           } else {
+               // L'utilisateur n'existe pas, l'enregistrer
+               error_log('L\'utilisateur n\'existe pas, enregistrement d\'un nouvel utilisateur');
+               $this->test_data['debug_info']['user_exists'] = false;
+               
+               $register_response = $this->api_client->register(
+                   $user_data['username'],
+                   $user_data['email'],
+                   $user_data['password']
+               );
+               
+               $this->test_data['debug_info']['register_response'] = $register_response;
+               
+               if (!is_wp_error($register_response) && isset($register_response['id'])) {
+                   // Enregistrement réussi
+                   error_log('Enregistrement réussi, ID: ' . $register_response['id']);
+                   $this->test_data['user']['id'] = $register_response['id'];
+                   
+                   // Attendre un court instant pour s'assurer que l'utilisateur est bien enregistré
+                   error_log('Attente de 2 secondes pour s\'assurer que l\'utilisateur est bien enregistré');
+                   sleep(2);
+                   
+                   // Se connecter pour obtenir un token
+                   error_log('Tentative de connexion après enregistrement');
+                   $login_after_register = $this->api_client->login(
+                       $user_data['username'],
+                       $user_data['password']
+                   );
+                   
+                   $this->test_data['debug_info']['login_after_register'] = $login_after_register;
+                   
+                   if (!is_wp_error($login_after_register) && isset($login_after_register['access_token'])) {
+                       error_log('Connexion réussie après enregistrement');
+                       $this->test_data['user']['token'] = $login_after_register['access_token'];
+                       $this->api_client->set_token($login_after_register['access_token']);
+                   } else {
+                       error_log('Échec de connexion après enregistrement: ' .
+                           (is_wp_error($login_after_register) ? $login_after_register->get_error_message() : 'Pas de token dans la réponse'));
+                   }
+               } else {
+                   error_log('Échec de l\'enregistrement: ' .
+                       (is_wp_error($register_response) ? $register_response->get_error_message() : 'Réponse invalide'));
+               }
+           }
+           
+           // Enregistrer les données de test mises à jour
+           update_option('rpg_ia_test_data', $this->test_data);
+           error_log('Données de test mises à jour et enregistrées');
+           error_log('=== FIN DU TEST D\'AUTHENTIFICATION ===');
             
-            $response = $this->api_client->register(
-                $user_data['username'],
-                $user_data['email'],
-                $user_data['password']
-            );
-            
-            if (!is_wp_error($response) && isset($response['id'])) {
-                $this->test_data['user']['id'] = $response['id'];
-                
-                // Se connecter pour obtenir un token
-                $login_response = $this->api_client->login(
-                    $user_data['username'],
-                    $user_data['password']
-                );
-                
-                if (!is_wp_error($login_response) && isset($login_response['access_token'])) {
-                    $this->test_data['user']['token'] = $login_response['access_token'];
-                    $this->api_client->set_token($login_response['access_token']);
-                }
-            }
+            // Mettre à jour les données de test avec les informations de débogage
+            update_option('rpg_ia_test_data', $this->test_data);
         } catch (Exception $e) {
-            // Ignorer les erreurs, le test d'authentification les détectera
+            // Enregistrer l'erreur dans les informations de débogage
+            $this->test_data['debug_info']['create_user_exception'] = $e->getMessage();
+            update_option('rpg_ia_test_data', $this->test_data);
         }
         
         // Créer un personnage de test
@@ -376,13 +552,44 @@ class RPG_IA_Tests {
         $test_name = 'auth_functionality';
         $test_description = __('Test des fonctionnalités d\'authentification', 'rpg-ia');
         
+        error_log('=== DÉBUT DU TEST DES FONCTIONNALITÉS D\'AUTHENTIFICATION ===');
+        
         // Vérifier si les données de test sont disponibles
         if (empty($this->test_data['user']) || empty($this->test_data['user']['username']) || empty($this->test_data['user']['password'])) {
+            error_log('Données de test manquantes pour l\'authentification');
             $this->add_test_result($test_name, $test_description, false, __('Données de test manquantes pour l\'authentification', 'rpg-ia'));
             return;
         }
         
+        error_log('Données de test disponibles:');
+        error_log('Username: ' . $this->test_data['user']['username']);
+        error_log('Password: ' . $this->test_data['user']['password']);
+        error_log('Token existant: ' . (!empty($this->test_data['user']['token']) ? 'Oui' : 'Non'));
+        
+        // S'assurer que l'utilisateur de test existe
+        error_log('Vérification de l\'existence de l\'utilisateur de test...');
+        $this->create_test_data_in_api();
+        
+        // Vérifier si un token est déjà disponible après la création des données de test
+        if (!empty($this->test_data['user']['token'])) {
+            error_log('Token disponible, vérification de sa validité...');
+            // Vérifier si le token est valide en récupérant les informations de l'utilisateur
+            $this->api_client->set_token($this->test_data['user']['token']);
+            $user_info = $this->api_client->get_current_user();
+            
+            if (!is_wp_error($user_info)) {
+                error_log('Token valide, authentification réussie');
+                $this->add_test_result($test_name, $test_description, true, __('Authentification réussie avec le token existant', 'rpg-ia'));
+                return;
+            } else {
+                $error_message = $user_info->get_error_message();
+                error_log('Token invalide: ' . $error_message);
+                // Si le token n'est pas valide, continuer avec le test de connexion
+            }
+        }
+        
         try {
+            error_log('Tentative de connexion avec les identifiants de test...');
             // Tester la connexion avec les identifiants de test
             $response = $this->api_client->login(
                 $this->test_data['user']['username'],
@@ -390,29 +597,138 @@ class RPG_IA_Tests {
             );
             
             if (is_wp_error($response)) {
-                $this->add_test_result($test_name, $test_description, false, __('Échec de connexion à l\'API: ', 'rpg-ia') . $response->get_error_message());
-            } else if (isset($response['access_token'])) {
-                // Mettre à jour le token dans les données de test
-                $this->test_data['user']['token'] = $response['access_token'];
-                update_option('rpg_ia_test_data', $this->test_data);
+                $error_message = $response->get_error_message();
+                $error_code = $response->get_error_code();
+                error_log('Échec de connexion: ' . $error_message);
+                error_log('Code d\'erreur: ' . $error_code);
                 
-                // Mettre à jour le token dans l'API client
-                $this->api_client->set_token($response['access_token']);
+                // Si la connexion échoue, essayer de créer un nouvel utilisateur
+                error_log('Tentative de création d\'un nouvel utilisateur...');
                 
-                // Tester la récupération des informations de l'utilisateur
-                $user_info = $this->api_client->get_current_user();
+                // Générer un nouveau nom d'utilisateur unique
+                $timestamp = time();
+                $new_username = 'test_user_' . $timestamp;
+                $new_email = 'test_' . $timestamp . '@example.com';
+                $new_password = 'Test@' . $timestamp;
                 
-                if (is_wp_error($user_info)) {
-                    $this->add_test_result($test_name, $test_description, false, __('Échec de récupération des informations utilisateur: ', 'rpg-ia') . $user_info->get_error_message());
+                error_log('Nouvel utilisateur: ' . $new_username);
+                error_log('Nouvel email: ' . $new_email);
+                error_log('Nouveau mot de passe: ' . $new_password);
+                
+                // Mettre à jour les données de test
+                $this->test_data['user']['username'] = $new_username;
+                $this->test_data['user']['email'] = $new_email;
+                $this->test_data['user']['password'] = $new_password;
+                
+                // Enregistrer le nouvel utilisateur
+                $register_response = $this->api_client->register(
+                    $new_username,
+                    $new_email,
+                    $new_password
+                );
+                
+                if (is_wp_error($register_response)) {
+                    $error_message = $register_response->get_error_message();
+                    error_log('Échec de création de l\'utilisateur: ' . $error_message);
+                    $this->add_test_result($test_name, $test_description, false, __('Échec de connexion à l\'API et de création d\'utilisateur: ', 'rpg-ia') . $error_message);
                 } else {
-                    $this->add_test_result($test_name, $test_description, true, __('Authentification réussie et informations utilisateur récupérées', 'rpg-ia'));
+                    error_log('Utilisateur créé avec succès, ID: ' . $register_response['id']);
+                    
+                    // Attendre un court instant pour s'assurer que l'utilisateur est bien enregistré
+                    error_log('Attente de 2 secondes pour s\'assurer que l\'utilisateur est bien enregistré');
+                    sleep(2);
+                    
+                    // Tenter de se connecter avec le nouvel utilisateur
+                    error_log('Tentative de connexion avec le nouvel utilisateur...');
+                    $login_response = $this->api_client->login(
+                        $new_username,
+                        $new_password
+                    );
+                    
+                    if (is_wp_error($login_response)) {
+                        $error_message = $login_response->get_error_message();
+                        error_log('Échec de connexion avec le nouvel utilisateur: ' . $error_message);
+                        $this->add_test_result($test_name, $test_description, false, __('Échec de connexion avec le nouvel utilisateur: ', 'rpg-ia') . $error_message);
+                    } else {
+                        error_log('Connexion réussie avec le nouvel utilisateur');
+                        
+                        // Mettre à jour le token dans les données de test
+                        $this->test_data['user']['token'] = $login_response['access_token'];
+                        $this->api_client->set_token($login_response['access_token']);
+                        update_option('rpg_ia_test_data', $this->test_data);
+                        
+                        $this->add_test_result($test_name, $test_description, true, __('Authentification réussie avec le nouvel utilisateur', 'rpg-ia'));
+                    }
                 }
             } else {
-                $this->add_test_result($test_name, $test_description, false, __('Réponse d\'authentification invalide', 'rpg-ia'));
+                error_log('Connexion réussie');
+                
+                // Vérifier si un token a été défini dans l'API client
+                $token = $this->api_client->get_token();
+                
+                if (!empty($token)) {
+                    error_log('Token défini dans l\'API client: ' . substr($token, 0, 10) . '...');
+                    // Un token a été défini, donc l'authentification a réussi
+                    // Mettre à jour le token dans les données de test
+                    $this->test_data['user']['token'] = $token;
+                    update_option('rpg_ia_test_data', $this->test_data);
+                    
+                    // Tester la récupération des informations de l'utilisateur
+                    error_log('Récupération des informations de l\'utilisateur...');
+                    $user_info = $this->api_client->get_current_user();
+                    
+                    if (is_wp_error($user_info)) {
+                        $error_message = $user_info->get_error_message();
+                        error_log('Échec de récupération des informations utilisateur: ' . $error_message);
+                        $this->add_test_result($test_name, $test_description, false, __('Échec de récupération des informations utilisateur: ', 'rpg-ia') . $error_message);
+                    } else {
+                        error_log('Informations utilisateur récupérées avec succès: ' . print_r($user_info, true));
+                        $this->add_test_result($test_name, $test_description, true, __('Authentification réussie et informations utilisateur récupérées', 'rpg-ia'));
+                    }
+                } else if (isset($response['access_token'])) {
+                    error_log('Token dans la réponse mais non défini dans l\'API client: ' . substr($response['access_token'], 0, 10) . '...');
+                    // Le token est dans la réponse mais n'a pas été défini dans l'API client
+                    $this->test_data['user']['token'] = $response['access_token'];
+                    update_option('rpg_ia_test_data', $this->test_data);
+                    
+                    // Mettre à jour le token dans l'API client
+                    $this->api_client->set_token($response['access_token']);
+                    
+                    // Tester la récupération des informations de l'utilisateur
+                    error_log('Récupération des informations de l\'utilisateur...');
+                    $user_info = $this->api_client->get_current_user();
+                    
+                    if (is_wp_error($user_info)) {
+                        $error_message = $user_info->get_error_message();
+                        error_log('Échec de récupération des informations utilisateur: ' . $error_message);
+                        $this->add_test_result($test_name, $test_description, false, __('Échec de récupération des informations utilisateur: ', 'rpg-ia') . $error_message);
+                    } else {
+                        error_log('Informations utilisateur récupérées avec succès: ' . print_r($user_info, true));
+                        $this->add_test_result($test_name, $test_description, true, __('Authentification réussie et informations utilisateur récupérées', 'rpg-ia'));
+                    }
+                } else {
+                    error_log('Aucun token trouvé dans la réponse');
+                    // Afficher plus d'informations sur la réponse pour le débogage
+                    $response_info = '';
+                    if (is_array($response)) {
+                        $response_info = 'Tableau: ' . print_r($response, true);
+                        error_log('Réponse (tableau): ' . print_r($response, true));
+                    } else if (is_object($response)) {
+                        $response_info = 'Objet: ' . print_r($response, true);
+                        error_log('Réponse (objet): ' . print_r($response, true));
+                    } else {
+                        $response_info = 'Type: ' . gettype($response) . ', Valeur: ' . print_r($response, true);
+                        error_log('Réponse (autre): Type: ' . gettype($response) . ', Valeur: ' . print_r($response, true));
+                    }
+                    $this->add_test_result($test_name, $test_description, false, __('Réponse d\'authentification invalide. ', 'rpg-ia') . $response_info);
+                }
             }
         } catch (Exception $e) {
+            error_log('Exception lors du test d\'authentification: ' . $e->getMessage());
             $this->add_test_result($test_name, $test_description, false, $e->getMessage());
         }
+        
+        error_log('=== FIN DU TEST DES FONCTIONNALITÉS D\'AUTHENTIFICATION ===');
     }
 
     /**

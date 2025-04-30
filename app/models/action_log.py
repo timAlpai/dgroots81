@@ -4,8 +4,8 @@ import enum
 from datetime import datetime, UTC
 
 def utc_now():
-    """Retourne la date et l'heure actuelles en UTC."""
-    return datetime.now(UTC)
+    """Retourne la date et l'heure actuelles."""
+    return datetime.now()
 from app.models.base import BaseModel
 
 class ActionType(str, enum.Enum):
@@ -61,4 +61,4 @@ class ActionLog(BaseModel):
         if not self.action_date and self.action_timestamp:
             self.action_date = self.action_timestamp.strftime("%Y-%m-%d")
         elif not self.action_date:
-            self.action_date = datetime.now(UTC).strftime("%Y-%m-%d")
+            self.action_date = datetime.now().strftime("%Y-%m-%d")

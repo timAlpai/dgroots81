@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -12,6 +12,7 @@ from app.models.game_session import GameSession
 from app.models.character import Character
 from app.models.scenario import Scenario
 from app.models.scene import Scene
+from app.models.action_log import ActionLog
 from app.schemas.game_session import (
     GameSessionCreate,
     GameSession as GameSessionSchema,
@@ -19,6 +20,8 @@ from app.schemas.game_session import (
     GameSessionWithDetails,
     GameSessionState
 )
+from app.schemas.user import User as UserSchema
+from app.schemas.action_log import ActionLog as ActionLogSchema
 from app.core import redis
 
 router = APIRouter(prefix="/game-sessions", tags=["game_sessions"])
@@ -35,7 +38,17 @@ async def read_game_sessions(
     Récupère toutes les sessions de jeu de l'utilisateur.
     Si l'utilisateur est un administrateur, récupère toutes les sessions.
     """
-    query = select(GameSession)
+    # Sélectionner explicitement les colonnes pour éviter les problèmes avec les champs JSON
+    columns = [
+        GameSession.id, GameSession.name, GameSession.description,
+        GameSession.is_active, GameSession.game_master_id,
+        GameSession.total_tokens_used, GameSession.total_game_time,
+        GameSession.total_actions, GameSession.current_scenario_id,
+        GameSession.current_scene_id, GameSession.difficulty_level,
+        GameSession.created_at, GameSession.updated_at
+    ]
+    
+    query = select(*columns)
     
     # Filtrer par utilisateur si ce n'est pas un administrateur
     if not current_user.is_superuser:
@@ -43,9 +56,9 @@ async def read_game_sessions(
         gm_query = query.filter(GameSession.game_master_id == current_user.id)
         
         # Sessions où l'utilisateur est un joueur
-        player_query = select(GameSession).join(
-            Character, 
-            (Character.game_session_id == GameSession.id) & 
+        player_query = select(*columns).join(
+            Character,
+            (Character.game_session_id == GameSession.id) &
             (Character.user_id == current_user.id)
         )
         
@@ -60,9 +73,31 @@ async def read_game_sessions(
     query = query.offset(skip).limit(limit)
     
     result = await db.execute(query)
-    sessions = result.scalars().all()
+    sessions = result.all()
     
-    return sessions
+    # Récupérer les champs JSON séparément pour chaque session
+    complete_sessions = []
+    for session_tuple in sessions:
+        # Convertir le tuple en dictionnaire
+        session_dict = {col.name: session_tuple[i]
+                        for i, col in enumerate(columns)}
+        
+        # Récupérer les champs JSON séparément
+        json_result = await db.execute(
+            select(GameSession.context_data, GameSession.game_rules)
+            .filter(GameSession.id == session_dict["id"])
+        )
+        json_data = json_result.first()
+        
+        if json_data:
+            session_dict["context_data"] = json_data[0]
+            session_dict["game_rules"] = json_data[1]
+        
+        # Créer un objet GameSession complet
+        complete_session = GameSession(**session_dict)
+        complete_sessions.append(complete_session)
+    
+    return complete_sessions
 
 @router.post("/", response_model=GameSessionSchema)
 async def create_game_session(
@@ -118,7 +153,58 @@ async def read_game_session(
             detail=f"Session de jeu avec l'ID {session_id} non trouvée"
         )
     
-    return session_with_details
+    # Convertir les objets en dictionnaires pour respecter le schéma GameSessionWithDetails
+    response_data = {}
+    
+    # Copier les attributs de base de la session
+    for key, value in session_with_details.__dict__.items():
+        if not key.startswith('_'):  # Ignorer les attributs privés de SQLAlchemy
+            response_data[key] = value
+    
+    # Convertir game_master en dictionnaire s'il existe
+    if session_with_details.game_master:
+        game_master_dict = {}
+        for key, value in session_with_details.game_master.__dict__.items():
+            if not key.startswith('_'):  # Ignorer les attributs privés de SQLAlchemy
+                game_master_dict[key] = value
+        response_data["game_master"] = game_master_dict
+    else:
+        response_data["game_master"] = None
+    
+    # Convertir characters en liste de dictionnaires
+    if session_with_details.characters:
+        characters_list = []
+        for char in session_with_details.characters:
+            char_dict = {}
+            for key, value in char.__dict__.items():
+                if not key.startswith('_'):  # Ignorer les attributs privés de SQLAlchemy
+                    char_dict[key] = value
+            characters_list.append(char_dict)
+        response_data["characters"] = characters_list
+    else:
+        response_data["characters"] = []
+    
+    # Convertir current_scenario en dictionnaire s'il existe
+    if session_with_details.current_scenario:
+        scenario_dict = {}
+        for key, value in session_with_details.current_scenario.__dict__.items():
+            if not key.startswith('_'):  # Ignorer les attributs privés de SQLAlchemy
+                scenario_dict[key] = value
+        response_data["current_scenario"] = scenario_dict
+    else:
+        response_data["current_scenario"] = None
+    
+    # Convertir current_scene en dictionnaire s'il existe
+    if session_with_details.current_scene:
+        scene_dict = {}
+        for key, value in session_with_details.current_scene.__dict__.items():
+            if not key.startswith('_'):  # Ignorer les attributs privés de SQLAlchemy
+                scene_dict[key] = value
+        response_data["current_scene"] = scene_dict
+    else:
+        response_data["current_scene"] = None
+    
+    return response_data
 
 @router.put("/{session_id}", response_model=GameSessionSchema)
 async def update_game_session(
@@ -383,3 +469,35 @@ async def save_session_state_to_db(session_id: int):
         
         # Supprimer de Redis
         await redis.redis_client.delete(f"session:{session_id}")
+
+@router.get("/{session_id}/actions", response_model=List[ActionLogSchema])
+async def read_session_actions(
+    session_id: int,
+    timestamp: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    session: GameSession = Depends(get_game_session)
+):
+    """
+    Récupère les actions d'une session de jeu.
+    Si un timestamp est fourni, ne récupère que les actions après ce timestamp.
+    """
+    # Vérifier si l'utilisateur a accès à la session
+    # Cette vérification est déjà faite par la dépendance get_game_session
+    
+    # Construire la requête pour récupérer les actions
+    query = select(ActionLog).filter(ActionLog.game_session_id == session_id)
+    
+    # Filtrer par timestamp si fourni
+    if timestamp:
+        from datetime import datetime, UTC
+        timestamp_date = datetime.fromtimestamp(timestamp, UTC)
+        query = query.filter(ActionLog.action_timestamp > timestamp_date)
+    
+    # Trier par timestamp
+    query = query.order_by(ActionLog.action_timestamp)
+    
+    # Exécuter la requête
+    result = await db.execute(query)
+    actions = result.scalars().all()
+    
+    return actions

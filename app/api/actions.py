@@ -164,7 +164,7 @@ async def create_action(
         scene = result.scalars().first()
     
     # Créer le log d'action
-    action_timestamp = datetime.now(UTC)
+    action_timestamp = datetime.now()
     action_date = action_timestamp.strftime("%Y-%m-%d")
     
     action_log = ActionLog(
@@ -215,7 +215,7 @@ async def create_action(
     
     session_state["context_window"] = context_window
     session_state["last_action_id"] = action_log.id
-    session_state["last_activity_time"] = datetime.now(UTC).isoformat()
+    session_state["last_activity_time"] = datetime.now().isoformat()
     
     # Mettre à jour l'état dans Redis
     await redis.redis_client.set(

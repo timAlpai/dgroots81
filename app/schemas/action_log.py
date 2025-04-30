@@ -20,7 +20,7 @@ class ActionLogBase(BaseModel):
 class ActionLogCreate(ActionLogBase):
     """Schéma pour la création de logs d'action"""
     game_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    action_timestamp: Optional[datetime] = Field(default_factory=lambda: datetime.now(UTC))
+    action_timestamp: Optional[datetime] = Field(default_factory=lambda: datetime.now())
 
 class ActionLogUpdate(BaseModel):
     """Schéma pour la mise à jour de logs d'action"""
@@ -34,7 +34,7 @@ class ActionLogInDB(ActionLogBase, BaseSchema):
     tokens_used: int = 0
     processing_time: float = 0.0
     game_data: Dict[str, Any] = Field(default_factory=dict)
-    action_timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    action_timestamp: datetime = Field(default_factory=lambda: datetime.now())
     action_date: str  # Format YYYY-MM-DD
 
 class ActionLog(ActionLogInDB):

@@ -47,7 +47,8 @@ class RPG_IA_API_Client {
      * @param    string    $token           Le token JWT pour l'authentification (optionnel).
      */
     public function __construct($api_base_url = null, $token = null) {
-        $this->api_base_url = $api_base_url ?: get_option('rpg_ia_api_url', 'http://localhost:8000');
+        // Utiliser l'URL du proxy Apache par défaut si aucune URL n'est fournie
+        $this->api_base_url = $api_base_url ?: get_option('rpg_ia_api_url', 'https://dgroots81.mandragore.ai/api/v1');
         $this->token = $token;
     }
 
@@ -60,6 +61,16 @@ class RPG_IA_API_Client {
     public function set_token($token) {
         $this->token = $token;
     }
+    
+    /**
+     * Récupère le token JWT actuel.
+     *
+     * @since    1.0.0
+     * @return   string    Le token JWT ou une chaîne vide si aucun token n'est défini.
+     */
+    public function get_token() {
+        return $this->token ? $this->token : '';
+    }
 
     /**
      * Effectue une requête vers l'API.
@@ -71,9 +82,39 @@ class RPG_IA_API_Client {
      * @param    array     $headers     Les en-têtes supplémentaires (optionnel).
      * @return   array|WP_Error         La réponse de l'API ou une erreur.
      */
-    public function request($endpoint, $method = 'GET', $data = null, $headers = array()) {
+    public function request($endpoint, $method = 'GET', $data = null, $headers = array(), $form_data = false) {
+        // Vérifier si l'URL de base contient déjà /api/v1
+        $base_url_has_api_v1 = (strpos($this->api_base_url, '/api/v1') !== false);
+        
+        // Vérifier si l'endpoint commence par api/
+        $endpoint_starts_with_api = (strpos($endpoint, 'api/') === 0);
+        
+        // Cas spécial pour le proxy Apache: si l'URL de base contient /api/v1 et l'endpoint commence par api/,
+        // ne pas ajouter de préfixe supplémentaire pour éviter la duplication
+        if ($base_url_has_api_v1 && $endpoint_starts_with_api) {
+            // Ne rien faire, utiliser l'endpoint tel quel
+            error_log('Endpoint commence par api/ et URL de base contient /api/v1, utilisation de l\'endpoint tel quel');
+        }
+        // Si l'URL de base contient déjà /api/v1, ne pas ajouter de préfixe api/v1/
+        else if ($base_url_has_api_v1) {
+            // Ajouter seulement api/ au début si nécessaire et si ce n'est pas health
+            if (strpos($endpoint, 'api/') === false && strpos($endpoint, 'health') === false) {
+                $endpoint = 'api/' . ltrim($endpoint, '/');
+                error_log('URL de base contient /api/v1, ajout du préfixe api/ à l\'endpoint');
+            }
+        } else {
+            // Sinon, ajouter le préfixe api/v1/ si nécessaire
+            if (strpos($endpoint, 'api/v1/') === false && strpos($endpoint, 'health') === false) {
+                $endpoint = 'api/v1/' . ltrim($endpoint, '/');
+                error_log('Ajout du préfixe api/v1/ à l\'endpoint');
+            }
+        }
+        
         // Construire l'URL complète
         $url = rtrim($this->api_base_url, '/') . '/' . ltrim($endpoint, '/');
+        
+        // Afficher l'URL pour le débogage
+        error_log('URL de requête API: ' . $url);
         
         // Préparer les arguments de la requête
         $args = array(
@@ -83,7 +124,6 @@ class RPG_IA_API_Client {
             'httpversion' => '1.1',
             'blocking' => true,
             'headers' => array(
-                'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
             ),
             'cookies' => array()
@@ -92,39 +132,68 @@ class RPG_IA_API_Client {
         // Ajouter le token d'authentification si disponible
         if ($this->token) {
             $args['headers']['Authorization'] = 'Bearer ' . $this->token;
+            error_log('Ajout du token d\'authentification à la requête');
         }
         
         // Ajouter les en-têtes supplémentaires
         if (!empty($headers)) {
             $args['headers'] = array_merge($args['headers'], $headers);
+            error_log('Ajout d\'en-têtes supplémentaires à la requête');
         }
         
         // Ajouter les données si nécessaire
         if ($data !== null) {
-            $args['body'] = json_encode($data);
+            if ($form_data) {
+                // Envoyer les données au format de formulaire
+                $args['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
+                $args['body'] = http_build_query($data);
+                error_log('Envoi des données au format de formulaire: ' . http_build_query($data));
+            } else {
+                // Envoyer les données au format JSON
+                $args['headers']['Content-Type'] = 'application/json';
+                $args['body'] = json_encode($data);
+                error_log('Envoi des données au format JSON: ' . json_encode($data));
+            }
         }
+        
+        // Afficher les arguments de la requête pour le débogage
+        error_log('Arguments de la requête: ' . print_r($args, true));
         
         // Effectuer la requête
         $response = wp_remote_request($url, $args);
         
         // Vérifier s'il y a une erreur
         if (is_wp_error($response)) {
+            error_log('Erreur de requête: ' . $response->get_error_message());
             return $response;
         }
         
         // Récupérer le code de statut
         $status_code = wp_remote_retrieve_response_code($response);
+        error_log('Code de statut de la réponse: ' . $status_code);
         
         // Récupérer le corps de la réponse
         $body = wp_remote_retrieve_body($response);
+        error_log('Corps de la réponse: ' . $body);
+        
         $data = json_decode($body, true);
         
         // Vérifier si la réponse est un succès
         if ($status_code >= 200 && $status_code < 300) {
+            error_log('Requête réussie');
             return $data;
         } else {
             // Créer une erreur avec les détails de la réponse
             $error_message = isset($data['detail']) ? $data['detail'] : 'Unknown error';
+            
+            // Formater le message d'erreur pour le log
+            if (is_array($error_message) || is_object($error_message)) {
+                $formatted_error = json_encode($error_message);
+                error_log('Erreur de requête (JSON): ' . $formatted_error);
+            } else {
+                error_log('Erreur de requête: ' . $error_message);
+            }
+            
             return new WP_Error($status_code, $error_message, $data);
         }
     }
@@ -138,15 +207,48 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error         Le token JWT ou une erreur.
      */
     public function login($username, $password) {
+        // Ajouter des logs pour le débogage
+        error_log('Tentative de connexion pour l\'utilisateur: ' . $username);
+        error_log('URL de base de l\'API: ' . $this->api_base_url);
+        
+        // Préparer les données au format de formulaire
         $data = array(
             'username' => $username,
-            'password' => $password
+            'password' => $password,
+            'grant_type' => 'password'
         );
         
-        $response = $this->request('api/auth/token', 'POST', $data);
+        // Utiliser l'endpoint d'authentification avec le format form-urlencoded
+        $response = $this->request('api/auth/token', 'POST', $data, array(), true);
         
-        if (!is_wp_error($response) && isset($response['access_token'])) {
-            $this->token = $response['access_token'];
+        // Ajouter des logs pour le débogage
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            $error_code = $response->get_error_code();
+            error_log('Échec de connexion: ' . $error_message);
+            error_log('Code d\'erreur: ' . $error_code);
+        } else {
+            error_log('Réponse de connexion: ' . print_r($response, true));
+        }
+        
+        // Vérifier si la réponse contient un token d'accès
+        if (!is_wp_error($response)) {
+            // Vérifier différents formats possibles de token
+            if (isset($response['access_token'])) {
+                $this->token = $response['access_token'];
+                error_log('Token d\'accès obtenu: ' . substr($this->token, 0, 10) . '...');
+            } else if (isset($response['token'])) {
+                $this->token = $response['token'];
+                error_log('Token obtenu: ' . substr($this->token, 0, 10) . '...');
+            } else if (isset($response['accessToken'])) {
+                $this->token = $response['accessToken'];
+                error_log('AccessToken obtenu: ' . substr($this->token, 0, 10) . '...');
+            } else if (isset($response['access'])) {
+                $this->token = $response['access'];
+                error_log('Access obtenu: ' . substr($this->token, 0, 10) . '...');
+            } else {
+                error_log('Aucun token trouvé dans la réponse');
+            }
         }
         
         return $response;
@@ -166,7 +268,7 @@ class RPG_IA_API_Client {
         }
         
         // Appeler l'API pour rafraîchir le token
-        $response = $this->request('api/auth/refresh', 'POST', array('username' => $username));
+        $response = $this->request('auth/refresh', 'POST', array('username' => $username));
         
         if (!is_wp_error($response) && isset($response['access_token'])) {
             $this->token = $response['access_token'];
@@ -188,10 +290,27 @@ class RPG_IA_API_Client {
         $data = array(
             'username' => $username,
             'email' => $email,
-            'password' => $password
+            'password' => $password,
+            'is_active' => true,
+            'is_superuser' => false
         );
         
-        return $this->request('api/auth/register', 'POST', $data);
+        // Ajouter des logs pour le débogage
+        error_log('Tentative d\'enregistrement de l\'utilisateur: ' . $username);
+        error_log('URL de base de l\'API: ' . $this->api_base_url);
+        
+        // Utiliser l'endpoint standard avec le format JSON
+        $response = $this->request('api/auth/register', 'POST', $data);
+        
+        // Ajouter des logs pour le débogage
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            error_log('Échec de l\'enregistrement: ' . $error_message);
+        } else {
+            error_log('Enregistrement réussi pour l\'utilisateur: ' . $username);
+        }
+        
+        return $response;
     }
 
     /**
@@ -201,7 +320,39 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error    Les informations de l'utilisateur ou une erreur.
      */
     public function get_current_user() {
-        return $this->request('api/auth/me', 'GET');
+        // Vérifier si un token est disponible
+        if (!$this->token) {
+            return new WP_Error('no_token', __('No token available for user info.', 'rpg-ia'));
+        }
+        
+        // Décoder le token JWT pour extraire l'ID de l'utilisateur
+        $token_parts = explode('.', $this->token);
+        if (count($token_parts) != 3) {
+            return new WP_Error('invalid_token', __('Invalid token format.', 'rpg-ia'));
+        }
+        
+        try {
+            $payload = json_decode(base64_decode(str_replace(
+                ['-', '_'],
+                ['+', '/'],
+                $token_parts[1]
+            )), true);
+            
+            if (!isset($payload['user_id'])) {
+                return new WP_Error('invalid_token', __('Token does not contain user_id.', 'rpg-ia'));
+            }
+            
+            $user_id = $payload['user_id'];
+            error_log('Extraction de l\'ID utilisateur depuis le token: ' . $user_id);
+            
+            // Utiliser l'endpoint avec l'ID de l'utilisateur au lieu de 'me'
+            $response = $this->request('api/users/' . $user_id, 'GET');
+            
+            return $response;
+        } catch (Exception $e) {
+            error_log('Erreur lors du décodage du token: ' . $e->getMessage());
+            return new WP_Error('token_decode_error', $e->getMessage());
+        }
     }
 
     /**
@@ -211,7 +362,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error    La liste des personnages ou une erreur.
      */
     public function get_characters() {
-        return $this->request('api/characters/', 'GET');
+        return $this->request('characters/', 'GET');
     }
 
     /**
@@ -222,7 +373,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error             Les données du personnage ou une erreur.
      */
     public function get_character($character_id) {
-        return $this->request('api/characters/' . $character_id, 'GET');
+        return $this->request('characters/' . $character_id, 'GET');
     }
 
     /**
@@ -233,7 +384,80 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error     Les données du personnage créé ou une erreur.
      */
     public function create_character($data) {
-        return $this->request('api/characters/', 'POST', $data);
+        // Adapter les données au format attendu par le backend
+        $formatted_data = array();
+        
+        // Champs de base
+        $formatted_data['name'] = isset($data['name']) ? $data['name'] : '';
+        
+        // Convertir 'class' en 'character_class' et s'assurer qu'il est au format attendu par l'API (minuscules)
+        if (isset($data['class'])) {
+            // Convertir en majuscules pour le mapping, puis le résultat en minuscules
+            $class = strtoupper($data['class']);
+            // Mapper les classes en anglais vers les valeurs de l'enum CharacterClass (en minuscules)
+            $class_mapping = array(
+                'WARRIOR' => 'guerrier',
+                'CLERIC' => 'clerc',
+                'WIZARD' => 'magicien',
+                'THIEF' => 'voleur',
+                'DWARF' => 'nain',
+                'ELF' => 'elfe',
+                'HALFLING' => 'halfelin'
+            );
+            // Utiliser la valeur mappée ou convertir la classe originale en minuscules
+            $formatted_data['character_class'] = isset($class_mapping[$class]) ? $class_mapping[$class] : strtolower($class);
+        }
+        
+        // Niveau
+        $formatted_data['level'] = isset($data['level']) ? $data['level'] : 1;
+        
+        // Extraire les attributs du sous-objet 'attributes' s'il existe
+        if (isset($data['attributes']) && is_array($data['attributes'])) {
+            foreach ($data['attributes'] as $attr => $value) {
+                $formatted_data[$attr] = $value;
+            }
+        }
+        
+        // Ajouter les champs requis manquants
+        if (!isset($formatted_data['strength'])) $formatted_data['strength'] = 10;
+        if (!isset($formatted_data['intelligence'])) $formatted_data['intelligence'] = 10;
+        if (!isset($formatted_data['wisdom'])) $formatted_data['wisdom'] = 10;
+        if (!isset($formatted_data['dexterity'])) $formatted_data['dexterity'] = 10;
+        if (!isset($formatted_data['constitution'])) $formatted_data['constitution'] = 10;
+        if (!isset($formatted_data['charisma'])) $formatted_data['charisma'] = 10;
+        
+        // Points de vie
+        $formatted_data['max_hp'] = isset($data['max_hp']) ? $data['max_hp'] : 10;
+        $formatted_data['current_hp'] = isset($data['current_hp']) ? $data['current_hp'] : $formatted_data['max_hp'];
+        
+        // Récupérer l'ID de l'utilisateur à partir du token JWT
+        $user_id = $this->get_user_id_from_token();
+        if (is_wp_error($user_id)) {
+            return $user_id;
+        }
+        $formatted_data['user_id'] = $user_id;
+        
+        // Pour le game_session_id, utiliser celui fourni ou créer une session temporaire
+        if (isset($data['game_session_id'])) {
+            $formatted_data['game_session_id'] = $data['game_session_id'];
+        } else {
+            // Créer une session temporaire pour les tests
+            $session_data = array(
+                'name' => 'Test Session ' . time(),
+                'description' => 'Session temporaire pour les tests',
+                'game_master_id' => $user_id
+            );
+            $session_response = $this->create_game_session($session_data);
+            if (is_wp_error($session_response)) {
+                return $session_response;
+            }
+            $formatted_data['game_session_id'] = $session_response['id'];
+        }
+        
+        // Ajouter des logs pour le débogage
+        error_log('Données formatées pour la création de personnage: ' . print_r($formatted_data, true));
+        
+        return $this->request('characters/', 'POST', $formatted_data);
     }
 
     /**
@@ -245,7 +469,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error             Les données du personnage mis à jour ou une erreur.
      */
     public function update_character($character_id, $data) {
-        return $this->request('api/characters/' . $character_id, 'PUT', $data);
+        return $this->request('characters/' . $character_id, 'PUT', $data);
     }
 
     /**
@@ -256,7 +480,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error             La réponse de l'API ou une erreur.
      */
     public function delete_character($character_id) {
-        return $this->request('api/characters/' . $character_id, 'DELETE');
+        return $this->request('characters/' . $character_id, 'DELETE');
     }
 
     /**
@@ -266,7 +490,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error    La liste des sessions ou une erreur.
      */
     public function get_game_sessions() {
-        return $this->request('api/game-sessions/', 'GET');
+        return $this->request('game-sessions/', 'GET');
     }
 
     /**
@@ -277,7 +501,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error           Les données de la session ou une erreur.
      */
     public function get_game_session($session_id) {
-        return $this->request('api/game-sessions/' . $session_id, 'GET');
+        return $this->request('game-sessions/' . $session_id, 'GET');
     }
 
     /**
@@ -288,7 +512,39 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error     Les données de la session créée ou une erreur.
      */
     public function create_game_session($data) {
-        return $this->request('api/game-sessions/', 'POST', $data);
+        // Adapter les données au format attendu par le backend
+        $formatted_data = array();
+        
+        // Champs de base
+        $formatted_data['name'] = isset($data['name']) ? $data['name'] : 'Session ' . time();
+        $formatted_data['description'] = isset($data['description']) ? $data['description'] : '';
+        $formatted_data['is_active'] = isset($data['is_active']) ? $data['is_active'] : true;
+        
+        // Règles du jeu et niveau de difficulté
+        $formatted_data['game_rules'] = isset($data['game_rules']) ? $data['game_rules'] : 'OSE';
+        $formatted_data['difficulty_level'] = isset($data['difficulty_level']) ? $data['difficulty_level'] : 'standard';
+        
+        // Récupérer l'ID du maître de jeu (game_master_id)
+        if (isset($data['game_master_id'])) {
+            $formatted_data['game_master_id'] = $data['game_master_id'];
+        } else {
+            // Si non fourni, utiliser l'ID de l'utilisateur actuel
+            $user_id = $this->get_user_id_from_token();
+            if (is_wp_error($user_id)) {
+                return $user_id;
+            }
+            $formatted_data['game_master_id'] = $user_id;
+        }
+        
+        // Gérer le scénario si fourni
+        if (isset($data['scenario_id'])) {
+            $formatted_data['current_scenario_id'] = $data['scenario_id'];
+        }
+        
+        // Ajouter des logs pour le débogage
+        error_log('Données formatées pour la création de session: ' . print_r($formatted_data, true));
+        
+        return $this->request('game-sessions/', 'POST', $formatted_data);
     }
 
     /**
@@ -300,7 +556,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error           Les données de la session mise à jour ou une erreur.
      */
     public function update_game_session($session_id, $data) {
-        return $this->request('api/game-sessions/' . $session_id, 'PUT', $data);
+        return $this->request('game-sessions/' . $session_id, 'PUT', $data);
     }
 
     /**
@@ -311,7 +567,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error           La réponse de l'API ou une erreur.
      */
     public function delete_game_session($session_id) {
-        return $this->request('api/game-sessions/' . $session_id, 'DELETE');
+        return $this->request('game-sessions/' . $session_id, 'DELETE');
     }
 
     /**
@@ -323,7 +579,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error           La liste des actions ou une erreur.
      */
     public function get_session_actions($session_id, $timestamp = null) {
-        $endpoint = 'api/game-sessions/' . $session_id . '/actions';
+        $endpoint = 'game-sessions/' . $session_id . '/actions';
         
         if ($timestamp !== null) {
             $endpoint .= '?timestamp=' . $timestamp;
@@ -340,7 +596,39 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error     Les données de l'action créée ou une erreur.
      */
     public function create_action($data) {
-        return $this->request('api/actions/', 'POST', $data);
+        // Transformer les données pour correspondre au format attendu par l'API
+        $formatted_data = array();
+        
+        // Mapper 'type' vers 'action_type'
+        if (isset($data['type'])) {
+            $formatted_data['action_type'] = $data['type'];
+        }
+        
+        // Mapper 'content' vers 'description'
+        if (isset($data['content'])) {
+            $formatted_data['description'] = $data['content'];
+        }
+        
+        // Conserver 'character_id'
+        if (isset($data['character_id'])) {
+            $formatted_data['character_id'] = $data['character_id'];
+        }
+        
+        // Ajouter 'scene_id' s'il existe
+        if (isset($data['scene_id'])) {
+            $formatted_data['scene_id'] = $data['scene_id'];
+        }
+        
+        // Ajouter 'game_data' s'il existe
+        if (isset($data['game_data'])) {
+            $formatted_data['game_data'] = $data['game_data'];
+        }
+        
+        // Ajouter des logs pour le débogage
+        error_log('Données originales pour la création d\'action: ' . print_r($data, true));
+        error_log('Données formatées pour la création d\'action: ' . print_r($formatted_data, true));
+        
+        return $this->request('actions/', 'POST', $formatted_data);
     }
 
     /**
@@ -350,7 +638,7 @@ class RPG_IA_API_Client {
      * @return   bool|WP_Error    True si la connexion est établie, une erreur sinon.
      */
     public function check_connection() {
-        $response = $this->request('api/health', 'GET');
+        $response = $this->request('health', 'GET');
         
         if (is_wp_error($response)) {
             return $response;
@@ -365,7 +653,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error    La liste des scénarios ou une erreur.
      */
     public function get_scenarios() {
-        return $this->request('api/scenarios/', 'GET');
+        return $this->request('scenarios/', 'GET');
     }
 
     /**
@@ -376,7 +664,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            Les données du scénario ou une erreur.
      */
     public function get_scenario($scenario_id) {
-        return $this->request('api/scenarios/' . $scenario_id, 'GET');
+        return $this->request('scenarios/' . $scenario_id, 'GET');
     }
 
     /**
@@ -387,7 +675,71 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error     Les données du scénario créé ou une erreur.
      */
     public function create_scenario($data) {
-        return $this->request('api/scenarios/', 'POST', $data);
+        // Adapter les données au format attendu par le backend
+        $formatted_data = array();
+        
+        // Transformer 'name' en 'title'
+        $formatted_data['title'] = isset($data['name']) ? $data['name'] : '';
+        
+        // Copier les autres champs
+        if (isset($data['description'])) {
+            $formatted_data['description'] = $data['description'];
+        }
+        
+        // Ajouter les champs optionnels s'ils existent
+        if (isset($data['recommended_level'])) {
+            $formatted_data['recommended_level'] = $data['recommended_level'];
+        }
+        
+        if (isset($data['difficulty'])) {
+            $formatted_data['difficulty'] = $data['difficulty'];
+        }
+        
+        if (isset($data['introduction'])) {
+            $formatted_data['introduction'] = $data['introduction'];
+        }
+        
+        if (isset($data['conclusion'])) {
+            $formatted_data['conclusion'] = $data['conclusion'];
+        }
+        
+        if (isset($data['tags'])) {
+            $formatted_data['tags'] = $data['tags'];
+        }
+        
+        if (isset($data['is_published'])) {
+            $formatted_data['is_published'] = $data['is_published'];
+        }
+        
+        // Extraire l'ID de l'utilisateur à partir du token JWT
+        if ($this->token) {
+            $token_parts = explode('.', $this->token);
+            if (count($token_parts) == 3) {
+                try {
+                    $payload = json_decode(base64_decode(str_replace(
+                        ['-', '_'],
+                        ['+', '/'],
+                        $token_parts[1]
+                    )), true);
+                    
+                    if (isset($payload['user_id'])) {
+                        $formatted_data['creator_id'] = $payload['user_id'];
+                    }
+                } catch (Exception $e) {
+                    error_log('Erreur lors du décodage du token pour creator_id: ' . $e->getMessage());
+                }
+            }
+        }
+        
+        // Si creator_id n'a pas pu être extrait du token, essayer de l'obtenir via l'API
+        if (!isset($formatted_data['creator_id'])) {
+            $user_info = $this->get_current_user();
+            if (!is_wp_error($user_info) && isset($user_info['id'])) {
+                $formatted_data['creator_id'] = $user_info['id'];
+            }
+        }
+        
+        return $this->request('scenarios/', 'POST', $formatted_data);
     }
 
     /**
@@ -399,7 +751,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            Les données du scénario mis à jour ou une erreur.
      */
     public function update_scenario($scenario_id, $data) {
-        return $this->request('api/scenarios/' . $scenario_id, 'PUT', $data);
+        return $this->request('scenarios/' . $scenario_id, 'PUT', $data);
     }
 
     /**
@@ -410,7 +762,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            La réponse de l'API ou une erreur.
      */
     public function delete_scenario($scenario_id) {
-        return $this->request('api/scenarios/' . $scenario_id, 'DELETE');
+        return $this->request('scenarios/' . $scenario_id, 'DELETE');
     }
 
     /**
@@ -421,7 +773,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            La liste des scènes ou une erreur.
      */
     public function get_scenario_scenes($scenario_id) {
-        return $this->request('api/scenarios/' . $scenario_id . '/scenes', 'GET');
+        return $this->request('scenarios/' . $scenario_id . '/scenes', 'GET');
     }
 
     /**
@@ -433,7 +785,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            Les données de la scène ou une erreur.
      */
     public function get_scenario_scene($scenario_id, $scene_id) {
-        return $this->request('api/scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'GET');
+        return $this->request('scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'GET');
     }
 
     /**
@@ -445,7 +797,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            Les données de la scène créée ou une erreur.
      */
     public function create_scenario_scene($scenario_id, $data) {
-        return $this->request('api/scenarios/' . $scenario_id . '/scenes', 'POST', $data);
+        return $this->request('scenarios/' . $scenario_id . '/scenes', 'POST', $data);
     }
 
     /**
@@ -458,7 +810,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            Les données de la scène mise à jour ou une erreur.
      */
     public function update_scenario_scene($scenario_id, $scene_id, $data) {
-        return $this->request('api/scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'PUT', $data);
+        return $this->request('scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'PUT', $data);
     }
 
     /**
@@ -470,7 +822,7 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error            La réponse de l'API ou une erreur.
      */
     public function delete_scenario_scene($scenario_id, $scene_id) {
-        return $this->request('api/scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'DELETE');
+        return $this->request('scenarios/' . $scenario_id . '/scenes/' . $scene_id, 'DELETE');
     }
 
     /**
@@ -486,7 +838,42 @@ class RPG_IA_API_Client {
             'status' => $status
         );
         
-        return $this->request('api/game-sessions/' . $session_id . '/status', 'PUT', $data);
+        return $this->request('game-sessions/' . $session_id . '/status', 'PUT', $data);
+    }
+    
+    /**
+     * Récupère l'ID de l'utilisateur à partir du token JWT.
+     *
+     * @since    1.0.0
+     * @return   int|WP_Error    L'ID de l'utilisateur ou une erreur.
+     */
+    private function get_user_id_from_token() {
+        if (!$this->token) {
+            return new WP_Error('no_token', __('No token available for user info.', 'rpg-ia'));
+        }
+        
+        // Décoder le token JWT pour extraire l'ID de l'utilisateur
+        $token_parts = explode('.', $this->token);
+        if (count($token_parts) != 3) {
+            return new WP_Error('invalid_token', __('Invalid token format.', 'rpg-ia'));
+        }
+        
+        try {
+            $payload = json_decode(base64_decode(str_replace(
+                ['-', '_'],
+                ['+', '/'],
+                $token_parts[1]
+            )), true);
+            
+            if (!isset($payload['user_id'])) {
+                return new WP_Error('invalid_token', __('Token does not contain user_id.', 'rpg-ia'));
+            }
+            
+            return $payload['user_id'];
+        } catch (Exception $e) {
+            error_log('Erreur lors du décodage du token: ' . $e->getMessage());
+            return new WP_Error('token_decode_error', $e->getMessage());
+        }
     }
 
     /**
@@ -504,7 +891,7 @@ class RPG_IA_API_Client {
             'type' => $type
         );
         
-        return $this->request('api/game-sessions/' . $session_id . '/override', 'POST', $data);
+        return $this->request('game-sessions/' . $session_id . '/override', 'POST', $data);
     }
     
     /**
@@ -514,18 +901,8 @@ class RPG_IA_API_Client {
      * @return   array|WP_Error    Les informations sur l'API ou une erreur.
      */
     public function check_api_status() {
-        // Essayer d'abord avec l'endpoint 'health'
+        // Utiliser l'endpoint health qui fonctionne
         $response = $this->request('health', 'GET');
-        
-        // Si cela échoue, essayer avec 'api/v1/health'
-        if (is_wp_error($response)) {
-            $response = $this->request('api/v1/health', 'GET');
-            
-            // Si cela échoue aussi, essayer avec 'api/health'
-            if (is_wp_error($response)) {
-                $response = $this->request('api/health', 'GET');
-            }
-        }
         
         if (is_wp_error($response)) {
             return $response;
@@ -549,5 +926,26 @@ class RPG_IA_API_Client {
         }
         
         return $response;
+    }
+    
+    /**
+     * Vérifie si un utilisateur existe par son nom d'utilisateur.
+     *
+     * @since    1.0.0
+     * @param    string    $username    Le nom d'utilisateur à vérifier.
+     * @return   bool|WP_Error          True si l'utilisateur existe, false sinon, ou une erreur.
+     */
+    public function check_user_exists($username) {
+        $response = $this->request('api/users/check-exists/' . urlencode($username), 'GET');
+        
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        
+        if (isset($response['exists'])) {
+            return $response['exists'];
+        }
+        
+        return false;
     }
 }
