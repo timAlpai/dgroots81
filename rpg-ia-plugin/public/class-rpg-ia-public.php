@@ -187,6 +187,23 @@ class RPG_IA_Public {
             'permission_callback' => array($this, 'rest_auth_permission')
         ));
         
+        // Nouvelles routes pour la gestion des tentatives de connexion
+        register_rest_route('rpg-ia/v1', '/auth/increment-attempts', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_increment_login_attempts'),
+            'permission_callback' => function() {
+                return is_user_logged_in();
+            }
+        ));
+        
+        register_rest_route('rpg-ia/v1', '/auth/reset-attempts', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_reset_login_attempts'),
+            'permission_callback' => function() {
+                return is_user_logged_in();
+            }
+        ));
+        
         register_rest_route('rpg-ia/v1', '/characters', array(
             'methods' => 'GET',
             'callback' => array($this, 'rest_get_characters'),
@@ -274,9 +291,18 @@ class RPG_IA_Public {
      * @return   string            Le contenu HTML du shortcode.
      */
     public function shortcode_dashboard($atts) {
-        // Vérifier si l'utilisateur est connecté
+        // Vérifier si l'utilisateur est connecté à WordPress
         if (!is_user_logged_in()) {
             return $this->get_login_form();
+        }
+        
+        // Vérifier si l'utilisateur est authentifié auprès de l'API
+        $auth_handler = new RPG_IA_Auth_Handler();
+        if (!$auth_handler->is_api_authenticated()) {
+            // Afficher le formulaire de connexion API
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'partials/rpg-ia-api-login-form.php';
+            return ob_get_clean();
         }
         
         // Inclure le template du tableau de bord
@@ -293,9 +319,18 @@ class RPG_IA_Public {
      * @return   string            Le contenu HTML du shortcode.
      */
     public function shortcode_characters($atts) {
-        // Vérifier si l'utilisateur est connecté
+        // Vérifier si l'utilisateur est connecté à WordPress
         if (!is_user_logged_in()) {
             return $this->get_login_form();
+        }
+        
+        // Vérifier si l'utilisateur est authentifié auprès de l'API
+        $auth_handler = new RPG_IA_Auth_Handler();
+        if (!$auth_handler->is_api_authenticated()) {
+            // Afficher le formulaire de connexion API
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'partials/rpg-ia-api-login-form.php';
+            return ob_get_clean();
         }
         
         // Inclure le template de la liste des personnages
@@ -312,9 +347,18 @@ class RPG_IA_Public {
      * @return   string            Le contenu HTML du shortcode.
      */
     public function shortcode_sessions($atts) {
-        // Vérifier si l'utilisateur est connecté
+        // Vérifier si l'utilisateur est connecté à WordPress
         if (!is_user_logged_in()) {
             return $this->get_login_form();
+        }
+        
+        // Vérifier si l'utilisateur est authentifié auprès de l'API
+        $auth_handler = new RPG_IA_Auth_Handler();
+        if (!$auth_handler->is_api_authenticated()) {
+            // Afficher le formulaire de connexion API
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'partials/rpg-ia-api-login-form.php';
+            return ob_get_clean();
         }
         
         // Inclure le template de la liste des sessions
@@ -331,9 +375,18 @@ class RPG_IA_Public {
      * @return   string            Le contenu HTML du shortcode.
      */
     public function shortcode_game_interface($atts) {
-        // Vérifier si l'utilisateur est connecté
+        // Vérifier si l'utilisateur est connecté à WordPress
         if (!is_user_logged_in()) {
             return $this->get_login_form();
+        }
+        
+        // Vérifier si l'utilisateur est authentifié auprès de l'API
+        $auth_handler = new RPG_IA_Auth_Handler();
+        if (!$auth_handler->is_api_authenticated()) {
+            // Afficher le formulaire de connexion API
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'partials/rpg-ia-api-login-form.php';
+            return ob_get_clean();
         }
         
         // Extraire les attributs
@@ -426,10 +479,10 @@ class RPG_IA_Public {
     }
 
     /**
-     * Récupère le formulaire de connexion.
+     * Récupère le formulaire de connexion WordPress.
      *
      * @since    1.0.0
-     * @return   string    Le formulaire de connexion HTML.
+     * @return   string    Le formulaire de connexion WordPress HTML.
      */
     private function get_login_form() {
         ob_start();
@@ -555,9 +608,18 @@ class RPG_IA_Public {
      * @return   string            Le contenu HTML du shortcode.
      */
     public function shortcode_profile($atts) {
-        // Vérifier si l'utilisateur est connecté
+        // Vérifier si l'utilisateur est connecté à WordPress
         if (!is_user_logged_in()) {
             return $this->get_login_form();
+        }
+        
+        // Vérifier si l'utilisateur est authentifié auprès de l'API
+        $auth_handler = new RPG_IA_Auth_Handler();
+        if (!$auth_handler->is_api_authenticated()) {
+            // Afficher le formulaire de connexion API
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'partials/rpg-ia-api-login-form.php';
+            return ob_get_clean();
         }
         
         // Inclure le template du profil utilisateur
@@ -1035,6 +1097,49 @@ class RPG_IA_Public {
         return new WP_REST_Response(array(
             'success' => true,
             'message' => __('Session deleted successfully.', 'rpg-ia')
+        ), 200);
+    }
+    
+    /**
+     * Incrémente le compteur de tentatives de connexion.
+     *
+     * @since    1.0.0
+     * @param    WP_REST_Request    $request    La requête REST.
+     * @return   WP_REST_Response               La réponse REST.
+     */
+    public function rest_increment_login_attempts($request) {
+        $user_id = get_current_user_id();
+        $attempts = get_user_meta($user_id, 'rpg_ia_login_attempts', true) ?: 0;
+        $attempts++;
+        
+        update_user_meta($user_id, 'rpg_ia_login_attempts', $attempts);
+        
+        // Si le nombre maximal de tentatives est atteint, verrouiller le compte
+        if ($attempts >= 5) {
+            update_user_meta($user_id, 'rpg_ia_lockout_time', time());
+        }
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'attempts' => $attempts
+        ), 200);
+    }
+
+    /**
+     * Réinitialise le compteur de tentatives de connexion.
+     *
+     * @since    1.0.0
+     * @param    WP_REST_Request    $request    La requête REST.
+     * @return   WP_REST_Response               La réponse REST.
+     */
+    public function rest_reset_login_attempts($request) {
+        $user_id = get_current_user_id();
+        
+        update_user_meta($user_id, 'rpg_ia_login_attempts', 0);
+        update_user_meta($user_id, 'rpg_ia_lockout_time', 0);
+        
+        return new WP_REST_Response(array(
+            'success' => true
         ), 200);
     }
     

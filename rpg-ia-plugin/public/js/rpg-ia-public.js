@@ -54,7 +54,7 @@
         // Vérifier si un token existe et s'il est valide
         checkToken();
         
-        // Formulaire de connexion
+        // Formulaire de connexion WordPress
         $('#rpg-ia-login-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -170,6 +170,143 @@
         $('#rpg-ia-refresh-token').on('click', function(e) {
             e.preventDefault();
             refreshToken();
+        });
+        
+        // Formulaire de connexion API
+        $('#rpg-ia-api-login-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            var username = $('#rpg-ia-api-username').val();
+            var password = $('#rpg-ia-api-password').val();
+            
+            if (!username || !password) {
+                showMessage('error', rpg_ia_public.messages.enter_credentials);
+                return;
+            }
+            
+            // Afficher le message de chargement
+            showMessage('info', rpg_ia_public.messages.logging_in);
+            
+            // Appeler l'API WordPress pour obtenir un token
+            $.ajax({
+                url: rpg_ia_public.rest_url + 'rpg-ia/v1/auth/token',
+                type: 'POST',
+                data: {
+                    username: username,
+                    password: password
+                },
+                success: function(response) {
+                    // Stocker le token
+                    token = response.access_token;
+                    localStorage.setItem('rpg_ia_token', token);
+                    
+                    // Stocker la date d'expiration du token
+                    var tokenData = parseJwt(token);
+                    if (tokenData && tokenData.exp) {
+                        localStorage.setItem('rpg_ia_token_exp', tokenData.exp * 1000); // Convertir en millisecondes
+                    }
+                    
+                    // Réinitialiser le compteur de tentatives de connexion
+                    $.ajax({
+                        url: rpg_ia_public.rest_url + 'rpg-ia/v1/auth/reset-attempts',
+                        type: 'POST',
+                        headers: {
+                            'X-WP-Nonce': rpg_ia_public.nonce
+                        }
+                    });
+                    
+                    // Recharger la page actuelle
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    var errorMessage = rpg_ia_public.messages.login_error;
+                    
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage += ': ' + xhr.responseJSON.message;
+                    }
+                    
+                    // Incrémenter le compteur de tentatives de connexion
+                    $.ajax({
+                        url: rpg_ia_public.rest_url + 'rpg-ia/v1/auth/increment-attempts',
+                        type: 'POST',
+                        headers: {
+                            'X-WP-Nonce': rpg_ia_public.nonce
+                        }
+                    });
+                    
+                    showMessage('error', errorMessage);
+                }
+            });
+        });
+        
+        // Formulaire d'inscription API
+        $('#rpg-ia-api-register-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            var username = $('#rpg-ia-api-reg-username').val();
+            var email = $('#rpg-ia-api-reg-email').val();
+            var password = $('#rpg-ia-api-reg-password').val();
+            var passwordConfirm = $('#rpg-ia-api-reg-password-confirm').val();
+            
+            if (!username || !email || !password) {
+                showMessage('error', rpg_ia_public.messages.enter_all_fields);
+                return;
+            }
+            
+            if (password !== passwordConfirm) {
+                showMessage('error', rpg_ia_public.messages.passwords_not_match);
+                return;
+            }
+            
+            if (password.length < 8) {
+                showMessage('error', 'Password must be at least 8 characters long.');
+                return;
+            }
+            
+            // Afficher le message de chargement
+            showMessage('info', rpg_ia_public.messages.registering);
+            
+            // Appeler l'API WordPress pour créer un compte
+            $.ajax({
+                url: rpg_ia_public.rest_url + 'rpg-ia/v1/auth/register',
+                type: 'POST',
+                data: {
+                    username: username,
+                    email: email,
+                    password: password
+                },
+                success: function(response) {
+                    showMessage('success', rpg_ia_public.messages.register_success);
+                    
+                    // Recharger la page après un délai pour afficher le formulaire de connexion
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                },
+                error: function(xhr) {
+                    var errorMessage = rpg_ia_public.messages.register_error;
+                    
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage += ': ' + xhr.responseJSON.message;
+                    }
+                    
+                    showMessage('error', errorMessage);
+                }
+            });
+        });
+        
+        // Afficher le formulaire d'inscription API
+        $('#rpg-ia-api-show-register').on('click', function(e) {
+            e.preventDefault();
+            $('#rpg-ia-api-about-card').hide();
+            $('#rpg-ia-api-register-card').show();
+        });
+        
+        // Afficher le formulaire de connexion API
+        $('#rpg-ia-api-show-login').on('click', function(e) {
+            e.preventDefault();
+            $('#rpg-ia-api-register-card').hide();
+            $('#rpg-ia-api-about-card').show();
         });
     }
     
@@ -787,13 +924,39 @@
         var tokenExp = localStorage.getItem('rpg_ia_token_exp');
         
         if (!token || !tokenExp) {
+            // Si nous sommes sur une page qui nécessite l'authentification API, afficher le formulaire de connexion API
+            if ($('#rpg-ia-api-login-form').length) {
+                // Nous sommes déjà sur le formulaire de connexion API, ne rien faire
+                return;
+            }
+            
+            // Vérifier si nous sommes sur une page qui nécessite l'authentification API
+            if ($('.rpg-ia-dashboard, .rpg-ia-character-list, .rpg-ia-session-list, .rpg-ia-game-interface, .rpg-ia-profile').length) {
+                // Rediriger vers la page de tableau de bord qui affichera le formulaire de connexion API
+                window.location.href = rpg_ia_public.dashboard_url;
+            }
+            
             return;
         }
         
-        // Vérifier si le token est expiré ou va expirer dans les 5 minutes
+        // Vérifier si le token est expiré
         var now = new Date().getTime();
         var expiresIn = parseInt(tokenExp) - now;
         
+        if (expiresIn <= 0) {
+            // Le token est expiré, le supprimer et rediriger vers la page de tableau de bord
+            localStorage.removeItem('rpg_ia_token');
+            localStorage.removeItem('rpg_ia_token_exp');
+            
+            if ($('.rpg-ia-dashboard, .rpg-ia-character-list, .rpg-ia-session-list, .rpg-ia-game-interface, .rpg-ia-profile').length) {
+                // Rediriger vers la page de tableau de bord qui affichera le formulaire de connexion API
+                window.location.href = rpg_ia_public.dashboard_url;
+            }
+            
+            return;
+        }
+        
+        // Vérifier si le token va expirer dans les 5 minutes
         if (expiresIn < 300000) { // 5 minutes en millisecondes
             refreshToken();
         }
