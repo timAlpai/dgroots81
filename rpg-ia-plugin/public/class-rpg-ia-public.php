@@ -65,15 +65,28 @@ class RPG_IA_Public {
      * @since    1.0.0
      */
     public function enqueue_scripts() {
-        wp_enqueue_script($this->plugin_name, plugin_dir_url(__FILE__) . 'js/rpg-ia-public.js', array('jquery'), $this->version, false);
-        
-        // Ajouter les variables localisées pour le script
-        wp_localize_script($this->plugin_name, 'rpg_ia_public', array(
+        wp_enqueue_script(
+            'rpg-ia-public',
+            plugin_dir_url(__FILE__) . 'js/rpg-ia-public.js',
+            array('jquery'),
+            $this->version,
+            false
+        );
+    
+        wp_enqueue_script(
+            'rpg-ia-character-script',
+            plugin_dir_url(__FILE__) . 'js/rpg-ia-character.js',
+            array('rpg-ia-public'),
+            $this->version,
+            false
+        );
+    
+        $localized_data = array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'rest_url' => rest_url(),
             'nonce' => wp_create_nonce('rpg_ia_public_nonce'),
             'api_url' => RPG_IA_API_URL,
-            'update_interval' => get_option('rpg_ia_update_interval', 5) * 1000, // Convertir en millisecondes
+            'update_interval' => get_option('rpg_ia_update_interval', 5) * 1000,
             'enable_chat' => get_option('rpg_ia_enable_chat', 'yes'),
             'dashboard_url' => get_permalink(get_option('rpg_ia_page_rpg-ia-dashboard')),
             'login_url' => home_url('/'),
@@ -109,9 +122,12 @@ class RPG_IA_Public {
                 'action_error' => __('Error processing action', 'rpg-ia'),
                 'select_character' => __('Select a character', 'rpg-ia')
             )
-        ));
+        );
+    
+        wp_localize_script('rpg-ia-public', 'rpg_ia_public', $localized_data);
+        wp_localize_script('rpg-ia-character-script', 'rpg_ia_public', $localized_data);
     }
-
+    
     /**
      * Enregistre les shortcodes.
      *
@@ -543,7 +559,7 @@ class RPG_IA_Public {
                 'message' => __('Username, email and password are required.', 'rpg-ia')
             ), 400);
         }
-        
+        /*
         // Vérifier si l'utilisateur existe déjà
         if (username_exists($username)) {
             return new WP_REST_Response(array(
@@ -559,7 +575,7 @@ class RPG_IA_Public {
                 'message' => __('Email already exists.', 'rpg-ia')
             ), 400);
         }
-        
+        */
         // Enregistrer l'utilisateur
         $auth_handler = new RPG_IA_Auth_Handler();
         $response = $auth_handler->register($username, $email, $password);

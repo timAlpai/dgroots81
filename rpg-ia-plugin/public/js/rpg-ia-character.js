@@ -42,7 +42,8 @@
          */
         bindEvents: function() {
             // Liste des personnages
-            $('.rpg-ia-create-character-btn').on('click', this.showCreateCharacterForm.bind(this));
+            // $('.rpg-ia-create-character-btn').on('click', this.showCreateCharacterForm.bind(this));
+            $(document).on('click', '.rpg-ia-create-character-btn', this.showCreateCharacterForm.bind(this));
             $(document).on('click', '.rpg-ia-view-character-btn', this.viewCharacter.bind(this));
             $(document).on('click', '.rpg-ia-edit-character-btn', this.editCharacter.bind(this));
             $(document).on('click', '.rpg-ia-delete-character-btn', this.confirmDeleteCharacter.bind(this));
@@ -1146,6 +1147,7 @@
     // Initialiser le gestionnaire de personnages
     $(document).ready(function() {
         RPGIACharacter.init();
+        
     });
 
 })(jQuery);

@@ -329,12 +329,12 @@
             
             // Vérifier les champs obligatoires
             if (!characterData.name) {
-                showMessage('error', rpg_ia_public_l10n.enter_character_name);
+                showMessage('error', rpg_ia_public.enter_character_name);
                 return;
             }
             
             // Afficher le message de chargement
-            showMessage('info', rpg_ia_public_l10n.creating_character);
+            showMessage('info', rpg_ia_public.creating_character);
             
             // Appeler l'API pour créer un personnage
             $.ajax({
@@ -346,7 +346,7 @@
                 contentType: 'application/json',
                 data: JSON.stringify(characterData),
                 success: function(response) {
-                    showMessage('success', rpg_ia_public_l10n.character_created);
+                    showMessage('success', rpg_ia_public.character_created);
                     
                     // Rediriger vers la liste des personnages après un délai
                     setTimeout(function() {
@@ -354,7 +354,7 @@
                     }, 2000);
                 },
                 error: function(xhr) {
-                    var errorMessage = rpg_ia_public_l10n.character_error;
+                    var errorMessage = rpg_ia_public.character_error;
                     
                     if (xhr.responseJSON && xhr.responseJSON.detail) {
                         errorMessage += ': ' + xhr.responseJSON.detail;
@@ -380,12 +380,12 @@
             
             // Vérifier les champs obligatoires
             if (!sessionData.name) {
-                showMessage('error', rpg_ia_public_l10n.enter_session_name);
+                showMessage('error', rpg_ia_public.enter_session_name);
                 return;
             }
             
             // Afficher le message de chargement
-            showMessage('info', rpg_ia_public_l10n.creating_session);
+            showMessage('info', rpg_ia_public.creating_session);
             
             // Appeler l'API pour créer une session
             $.ajax({
@@ -397,7 +397,7 @@
                 contentType: 'application/json',
                 data: JSON.stringify(sessionData),
                 success: function(response) {
-                    showMessage('success', rpg_ia_public_l10n.session_created);
+                    showMessage('success', rpg_ia_public.session_created);
                     
                     // Rediriger vers la liste des sessions après un délai
                     setTimeout(function() {
@@ -405,7 +405,7 @@
                     }, 2000);
                 },
                 error: function(xhr) {
-                    var errorMessage = rpg_ia_public_l10n.session_error;
+                    var errorMessage = rpg_ia_public.session_error;
                     
                     if (xhr.responseJSON && xhr.responseJSON.detail) {
                         errorMessage += ': ' + xhr.responseJSON.detail;
@@ -439,7 +439,7 @@
         var charactersList = $('#rpg-ia-characters-list');
         
         // Afficher le message de chargement
-        charactersList.html('<p class="rpg-ia-loading">' + rpg_ia_public_l10n.loading_characters + '</p>');
+        charactersList.html('<p class="rpg-ia-loading">' + rpg_ia_public.loading_characters + '</p>');
         
         // Appeler l'API pour récupérer les personnages
         $.ajax({
@@ -450,7 +450,7 @@
             },
             success: function(response) {
                 if (response.length === 0) {
-                    charactersList.html('<p>' + rpg_ia_public_l10n.no_characters + '</p>');
+                    charactersList.html('<p>' + rpg_ia_public.no_characters + '</p>');
                     return;
                 }
                 
@@ -461,13 +461,13 @@
                     html += '<div class="rpg-ia-card">';
                     html += '<div class="rpg-ia-card-header">';
                     html += '<h3 class="rpg-ia-card-title">' + character.name + '</h3>';
-                    html += '<p class="rpg-ia-card-subtitle">' + character.character_class + ' - ' + rpg_ia_public_l10n.level + ' ' + character.level + '</p>';
+                    html += '<p class="rpg-ia-card-subtitle">' + character.character_class + ' - ' + rpg_ia_public.level + ' ' + character.level + '</p>';
                     html += '</div>';
                     html += '<div class="rpg-ia-card-content">';
                     html += '<p>' + character.description + '</p>';
                     html += '</div>';
                     html += '<div class="rpg-ia-card-footer">';
-                    html += '<a href="' + rpg_ia_public.character_url.replace('{id}', character.id) + '" class="rpg-ia-button">' + rpg_ia_public_l10n.view_details + '</a>';
+                    html += '<a href="' + rpg_ia_public.character_url.replace('{id}', character.id) + '" class="rpg-ia-button">' + rpg_ia_public.view_details + '</a>';
                     html += '</div>';
                     html += '</div>';
                 });
@@ -475,7 +475,7 @@
                 charactersList.html(html);
             },
             error: function() {
-                charactersList.html('<p class="rpg-ia-error">' + rpg_ia_public_l10n.error_loading_characters + '</p>');
+                charactersList.html('<p class="rpg-ia-error">' + rpg_ia_public.error_loading_characters + '</p>');
             }
         });
     }
@@ -487,7 +487,7 @@
         var sessionsList = $('#rpg-ia-sessions-list');
         
         // Afficher le message de chargement
-        sessionsList.html('<p class="rpg-ia-loading">' + rpg_ia_public_l10n.loading_sessions + '</p>');
+        sessionsList.html('<p class="rpg-ia-loading">' + rpg_ia_public.loading_sessions + '</p>');
         
         // Appeler l'API pour récupérer les sessions
         $.ajax({
@@ -498,7 +498,7 @@
             },
             success: function(response) {
                 if (response.length === 0) {
-                    sessionsList.html('<p>' + rpg_ia_public_l10n.no_sessions + '</p>');
+                    sessionsList.html('<p>' + rpg_ia_public.no_sessions + '</p>');
                     return;
                 }
                 
@@ -509,14 +509,14 @@
                     html += '<div class="rpg-ia-card">';
                     html += '<div class="rpg-ia-card-header">';
                     html += '<h3 class="rpg-ia-card-title">' + session.name + '</h3>';
-                    html += '<p class="rpg-ia-card-subtitle">' + rpg_ia_public_l10n.gm + ': ' + session.game_master.username + ' - ' + rpg_ia_public_l10n.players + ': ' + session.players.length + '/' + session.max_players + '</p>';
+                    html += '<p class="rpg-ia-card-subtitle">' + rpg_ia_public.gm + ': ' + session.game_master.username + ' - ' + rpg_ia_public.players + ': ' + session.players.length + '/' + session.max_players + '</p>';
                     html += '</div>';
                     html += '<div class="rpg-ia-card-content">';
                     html += '<p>' + session.description + '</p>';
                     html += '</div>';
                     html += '<div class="rpg-ia-card-footer">';
-                    html += '<a href="' + rpg_ia_public.session_url.replace('{id}', session.id) + '" class="rpg-ia-button rpg-ia-button-secondary">' + rpg_ia_public_l10n.view_details + '</a> ';
-                    html += '<a href="' + rpg_ia_public.play_url.replace('{id}', session.id) + '" class="rpg-ia-button">' + rpg_ia_public_l10n.join_session + '</a>';
+                    html += '<a href="' + rpg_ia_public.session_url.replace('{id}', session.id) + '" class="rpg-ia-button rpg-ia-button-secondary">' + rpg_ia_public.view_details + '</a> ';
+                    html += '<a href="' + rpg_ia_public.play_url.replace('{id}', session.id) + '" class="rpg-ia-button">' + rpg_ia_public.join_session + '</a>';
                     html += '</div>';
                     html += '</div>';
                 });
@@ -524,7 +524,7 @@
                 sessionsList.html(html);
             },
             error: function() {
-                sessionsList.html('<p class="rpg-ia-error">' + rpg_ia_public_l10n.error_loading_sessions + '</p>');
+                sessionsList.html('<p class="rpg-ia-error">' + rpg_ia_public.error_loading_sessions + '</p>');
             }
         });
     }
@@ -538,7 +538,7 @@
         var sessionId = urlParams.get('session_id');
         
         if (!sessionId) {
-            showMessage('error', rpg_ia_public_l10n.no_session_specified);
+            showMessage('error', rpg_ia_public.no_session_specified);
             return;
         }
         
@@ -551,13 +551,13 @@
             
             // Vérifier si une session est chargée
             if (!gameSession) {
-                showMessage('error', rpg_ia_public_l10n.no_session_loaded);
+                showMessage('error', rpg_ia_public.no_session_loaded);
                 return;
             }
             
             // Vérifier si un personnage est sélectionné
             if (!currentCharacter) {
-                showMessage('error', rpg_ia_public_l10n.no_character_selected);
+                showMessage('error', rpg_ia_public.no_character_selected);
                 return;
             }
             
@@ -566,7 +566,7 @@
             var actionDescription = $('#rpg-ia-action-description').val();
             
             if (!actionDescription) {
-                showMessage('error', rpg_ia_public_l10n.enter_action_description);
+                showMessage('error', rpg_ia_public.enter_action_description);
                 return;
             }
             
@@ -575,7 +575,7 @@
             $('#rpg-ia-action-description').prop('disabled', true);
             
             // Afficher le message de chargement
-            $('.rpg-ia-narration').append('<p class="rpg-ia-loading">' + rpg_ia_public_l10n.processing_action + '</p>');
+            $('.rpg-ia-narration').append('<p class="rpg-ia-loading">' + rpg_ia_public.processing_action + '</p>');
             
             // Appeler l'API pour soumettre l'action
             $.ajax({
@@ -603,7 +603,7 @@
                     updateGameInterface();
                 },
                 error: function(xhr) {
-                    var errorMessage = rpg_ia_public_l10n.action_error;
+                    var errorMessage = rpg_ia_public.action_error;
                     
                     if (xhr.responseJSON && xhr.responseJSON.detail) {
                         errorMessage += ': ' + xhr.responseJSON.detail;
@@ -640,7 +640,7 @@
      */
     function loadGameSession(sessionId) {
         // Afficher le message de chargement
-        $('.rpg-ia-narration').html('<p class="rpg-ia-loading">' + rpg_ia_public_l10n.loading_session + '</p>');
+        $('.rpg-ia-narration').html('<p class="rpg-ia-loading">' + rpg_ia_public.loading_session + '</p>');
         
         // Appeler l'API pour récupérer les détails de la session
         $.ajax({
@@ -665,7 +665,7 @@
                 startPeriodicUpdate();
             },
             error: function() {
-                $('.rpg-ia-narration').html('<p class="rpg-ia-error">' + rpg_ia_public_l10n.error_loading_session + '</p>');
+                $('.rpg-ia-narration').html('<p class="rpg-ia-error">' + rpg_ia_public.error_loading_session + '</p>');
             }
         });
     }
@@ -686,11 +686,11 @@
                 characterSelect.empty();
                 
                 // Ajouter l'option par défaut
-                characterSelect.append('<option value="">' + rpg_ia_public_l10n.select_character + '</option>');
+                characterSelect.append('<option value="">' + rpg_ia_public.select_character + '</option>');
                 
                 // Ajouter les personnages
                 $.each(response, function(i, character) {
-                    characterSelect.append('<option value="' + character.id + '">' + character.name + ' (' + character.character_class + ' ' + rpg_ia_public_l10n.level + ' ' + character.level + ')</option>');
+                    characterSelect.append('<option value="' + character.id + '">' + character.name + ' (' + character.character_class + ' ' + rpg_ia_public.level + ' ' + character.level + ')</option>');
                 });
                 
                 // Vérifier si un personnage est déjà associé à la session
@@ -734,9 +734,9 @@
                 
                 var html = '<h3>' + currentCharacter.name + '</h3>';
                 html += '<div class="rpg-ia-character-stats">';
-                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public_l10n.hp + '</div><div class="rpg-ia-stat-value">' + currentCharacter.current_hp + '/' + currentCharacter.max_hp + '</div></div>';
-                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public_l10n.ac + '</div><div class="rpg-ia-stat-value">' + currentCharacter.armor_class + '</div></div>';
-                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public_l10n.level + '</div><div class="rpg-ia-stat-value">' + currentCharacter.level + '</div></div>';
+                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public.hp + '</div><div class="rpg-ia-stat-value">' + currentCharacter.current_hp + '/' + currentCharacter.max_hp + '</div></div>';
+                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public.ac + '</div><div class="rpg-ia-stat-value">' + currentCharacter.armor_class + '</div></div>';
+                html += '<div class="rpg-ia-stat"><div class="rpg-ia-stat-name">' + rpg_ia_public.level + '</div><div class="rpg-ia-stat-value">' + currentCharacter.level + '</div></div>';
                 html += '</div>';
                 
                 characterInfo.html(html);
@@ -799,7 +799,7 @@
                 if (action.character) {
                     actionHtml += '<p class="rpg-ia-action-character"><strong>' + action.character.name + ':</strong> ' + action.description + '</p>';
                 } else {
-                    actionHtml += '<p class="rpg-ia-action-gm"><strong>' + rpg_ia_public_l10n.game_master + ':</strong> ' + action.description + '</p>';
+                    actionHtml += '<p class="rpg-ia-action-gm"><strong>' + rpg_ia_public.game_master + ':</strong> ' + action.description + '</p>';
                 }
                 
                 if (action.result) {
@@ -834,24 +834,24 @@
                 playersList.empty();
                 
                 // Ajouter le maître de jeu
-                playersList.append('<div class="rpg-ia-player rpg-ia-player-gm"><strong>' + rpg_ia_public_l10n.game_master + ':</strong> ' + gameSession.game_master.username + '</div>');
+                playersList.append('<div class="rpg-ia-player rpg-ia-player-gm"><strong>' + rpg_ia_public.game_master + ':</strong> ' + gameSession.game_master.username + '</div>');
                 
                 // Ajouter les joueurs
                 if (gameSession.players && gameSession.players.length > 0) {
-                    playersList.append('<h4>' + rpg_ia_public_l10n.players + '</h4>');
+                    playersList.append('<h4>' + rpg_ia_public.players + '</h4>');
                     
                     $.each(gameSession.players, function(i, player) {
                         var playerHtml = '<div class="rpg-ia-player">';
                         playerHtml += '<strong>' + player.character.name + '</strong> (' + player.user.username + ')';
                         playerHtml += '<div class="rpg-ia-player-stats">';
-                        playerHtml += '<span class="rpg-ia-player-hp">' + rpg_ia_public_l10n.hp + ': ' + player.character.current_hp + '/' + player.character.max_hp + '</span>';
+                        playerHtml += '<span class="rpg-ia-player-hp">' + rpg_ia_public.hp + ': ' + player.character.current_hp + '/' + player.character.max_hp + '</span>';
                         playerHtml += '</div>';
                         playerHtml += '</div>';
                         
                         playersList.append(playerHtml);
                     });
                 } else {
-                    playersList.append('<p>' + rpg_ia_public_l10n.no_players + '</p>');
+                    playersList.append('<p>' + rpg_ia_public.no_players + '</p>');
                 }
             }
         });

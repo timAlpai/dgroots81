@@ -116,14 +116,14 @@ class RPG_IA_Auth_Handler {
         // Enregistrer l'utilisateur via l'API
         $response = $this->api_client->register($username, $email, $password);
         
-        if (is_wp_error($response)) {
+       /*  if (is_wp_error($response)) {
             // Vérifier si l'erreur est due à un utilisateur existant
             $error_message = $response->get_error_message();
             if (strpos($error_message, 'already exists') !== false) {
                 return new WP_Error('api_username_exists', __('This username already exists in the API. Please choose another username.', 'rpg-ia'));
             }
             return $response;
-        }
+        } */
         
         // Associer le compte API à l'utilisateur WordPress
         $this->associate_api_account($username);
@@ -324,6 +324,7 @@ class RPG_IA_Auth_Handler {
      *
      * @return bool True si un compte API existe, false sinon.
      */
+
     public function has_api_account() {
         // Récupérer l'ID de l'utilisateur WordPress courant
         $wp_user_id = get_current_user_id();
@@ -333,7 +334,21 @@ class RPG_IA_Auth_Handler {
         
         return !empty($api_username);
     }
-
+    /**
+     * Vérifie si un utilisateur existe côté FastAPI.
+     * 
+     * @param string $username Nom d'utilisateur à vérifier.
+     * @return bool|WP_Error True si l'utilisateur existe, false sinon, ou une erreur.
+     */
+    public function check_user_exists($username) {
+        $response = $this->request('users/check-exists/' . urlencode($username), 'GET');
+        
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        
+        return isset($response['exists']) ? $response['exists'] : false;
+    }
     /**
      * Associe un compte API à l'utilisateur WordPress courant.
      *
@@ -354,4 +369,5 @@ class RPG_IA_Auth_Handler {
         
         return true;
     }
+
 }
