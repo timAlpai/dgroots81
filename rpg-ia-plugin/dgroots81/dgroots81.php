@@ -27,6 +27,8 @@ register_activation_hook(__FILE__, function() {
 // Chargement des fichiers admin si dans l'admin
 if (is_admin()) {
     require_once plugin_dir_path(__FILE__) . 'admin/options-page.php';
+    require_once plugin_dir_path(__FILE__) . 'admin/user-management-page.php';
+
 }
 
 // Chargement des fichiers publics (WooCommerce)
@@ -40,10 +42,11 @@ add_filter('body_class', function($classes) {
 // Ajout des menus admin du plugin
 add_action('admin_menu', 'dgroots81_add_admin_menu');
 // Hook AJAX admin pour suppression utilisateur via OSE
-add_action('wp_ajax_supprimer_api_ose', 'dgroots81_handle_supprimer_api');
+
     }
     return $classes;
 });
+add_action('wp_ajax_supprimer_api_ose', 'dgroots81_handle_supprimer_api');
 // Endpoint AJAX pour tester /health de l’API distante
 add_action('wp_ajax_test_api_health', function() {
     // Lire la baseurl depuis les options

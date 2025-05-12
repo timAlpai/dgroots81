@@ -20,7 +20,13 @@ add_action('admin_enqueue_scripts', function($hook) {
         true
     );
     $nonce = wp_create_nonce('supprimer_api_ose');
-    wp_localize_script('dgroots81-user-management', 'dgroots81UserNonce', $nonce);
+    //wp_localize_script('dgroots81-user-management', 'dgroots81UserNonce', $nonce);
+    wp_localize_script('dgroots81-user-management', 'dgroots81AdminData', [
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce'   => wp_create_nonce('supprimer_api_ose'),
+    ]);
+    
+    
 });
 }
 
@@ -264,7 +270,7 @@ function dgroots81_user_management_page() {
                 });
             }
 
-            // (Suppression : la vérification d’existence API est désormais côté PHP)
+          
 
             // Message de retour
             let messageDiv = document.createElement('div');
