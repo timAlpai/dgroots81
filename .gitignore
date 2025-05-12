@@ -11,6 +11,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+rpg-ia-plugin_old/
 
 # Fichiers de couverture
 .coverage
