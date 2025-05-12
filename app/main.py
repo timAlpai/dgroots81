@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.core import config, redis, llm_client
 from app.core.database import get_db
-from app.api import auth, users, game_sessions, characters, actions, scenarios, scenes
+from app.api import auth, users, game_sessions, characters, actions, scenarios, scenes, game
 
 app = FastAPI(
     title="RPG-IA API",
@@ -53,4 +53,4 @@ app.include_router(characters.router, prefix="/api")
 app.include_router(actions.router, prefix="/api")
 app.include_router(scenarios.router, prefix="/api")
 app.include_router(scenes.router, prefix="/api")
-
+app.include_router(game.router)
