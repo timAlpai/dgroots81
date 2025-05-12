@@ -4,21 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Inclusion de la page de gestion des utilisateurs
-require_once plugin_dir_path(__FILE__) . 'user-management-page.php';
-// Enqueue du JS admin uniquement sur la page de gestion des utilisateurs du plugin
-add_action('admin_enqueue_scripts', function($hook) {
-    if (isset($_GET['page']) && $_GET['page'] === 'dgroots81-user-management') {
-        wp_enqueue_script(
-            'dgroots81-admin-user-management',
-            plugins_url('admin/user-management.js', dirname(__FILE__)),
-            ['jquery'],
-            '1.0',
-            true
-        );
-        wp_localize_script('dgroots81-admin-user-management', 'dgroots81AdminData', ['ajaxurl' => admin_url('admin-ajax.php')]);
-    }
-});
+
 
 // Ajout du menu d'administration
 add_action('admin_menu', 'dgroots81_add_admin_menu');
@@ -206,13 +192,8 @@ function dgroots81_options_page() {
                     <td><input type="password" id="dgroots81-api-admin-password" name="dgroots81_api_admin_password" class="regular-text" autocomplete="off" value="<?php echo $admin_api_password; ?>"></td>
                 </tr>
             </table>
-        </form>
-        <?php if (!empty($admin_api_username) && !empty($admin_api_password)): ?>
             <div class="dgroots81-api-admin-actions" style="display:flex; gap:12px; align-items:center; margin-top:16px;">
-                <form method="post" style="margin:0;">
-                    <?php wp_nonce_field('dgroots81_api_admin_action', 'dgroots81_api_admin_nonce'); ?>
-                    <button type="submit" name="dgroots81_api_admin_submit" class="button button-primary"><?php _e('Create / Edit API admin', 'dgroots81'); ?></button>
-                </form>
+                <button type="submit" name="dgroots81_api_admin_submit" class="button button-primary"><?php _e('Create / Edit API admin', 'dgroots81'); ?></button>
                 <button type="button" id="dgroots81-api-admin-login" class="button button-secondary primary"><?php _e('Login', 'dgroots81'); ?></button>
             </div>
             <div id="dgroots81-api-admin-login-result" style="margin-top:24px; padding:16px 20px 16px 12px; font-weight:bold; border:1px solid #ccd0d4; border-radius:4px; background:#f9f9f9; min-height:32px;"></div>
@@ -292,8 +273,7 @@ function dgroots81_options_page() {
                     }
                 });
             </script>
-        <?php endif; ?>
-    </div>
+        </div>
 
     <script type="text/javascript">
         document.addEventListener('DOMContentLoaded', function() {

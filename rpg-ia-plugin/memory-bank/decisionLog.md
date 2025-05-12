@@ -8,6 +8,7 @@ This file records architectural and implementation decisions using a list format
 
 ## Decision
 
+[2025-05-12 09:30:29] - Décision : Ajout d’un mécanisme automatique (init + cron WordPress) pour rafraîchir et vérifier le token admin API OSE à chaque chargement du plugin et régulièrement, afin de garantir la connexion et la validité du compte admin sans intervention manuelle.
 *
 
 ## Rationale 
@@ -17,3 +18,5 @@ This file records architectural and implementation decisions using a list format
 ## Implementation Details
 
 *
+[2025-05-12 07:37:23] - Décision : L’inclusion du script JS d’administration pour la gestion des utilisateurs (et l’injection du nonce) a été déplacée de dgroots81.php vers le fichier user-management-page.php.  
+Raison : Cela garantit que le JS et le nonce sont toujours chargés uniquement sur la page concernée, évitant les problèmes de ciblage du hook admin_enqueue_scripts et assurant la robustesse de l’interface d’administration.

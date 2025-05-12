@@ -2,34 +2,27 @@
 // Sécurité : Bloquer l'accès direct
 if (!defined('ABSPATH')) {
     exit;
-// Enqueue du JS admin uniquement sur la page de gestion des utilisateurs du plugin
-/**
- * Enqueue le script JS et injecte le nonce pour la suppression API OSE
- */
-add_action('admin_enqueue_scripts', function($hook) {
-    error_log('HOOK ACTUEL : ' . $hook); // DEBUG : log du hook courant
-    // Adapter le $hook si besoin pour cibler uniquement la page de gestion des utilisateurs du plugin
-    if ($hook !== 'toplevel_page_dgroots81_user_management') {
-        return;
-    }
-    wp_enqueue_script(
-        'dgroots81-user-management',
-        plugins_url('admin/user-management.js', dirname(__FILE__)),
-        [],
-        null,
-        true
-    );
-    $nonce = wp_create_nonce('supprimer_api_ose');
-    //wp_localize_script('dgroots81-user-management', 'dgroots81UserNonce', $nonce);
-    wp_localize_script('dgroots81-user-management', 'dgroots81AdminData', [
-        'ajaxurl' => admin_url('admin-ajax.php'),
-        'nonce'   => wp_create_nonce('supprimer_api_ose'),
-    ]);
-    
-    
-});
+
 }
 
+add_action('admin_enqueue_scripts', function($hook) {
+    // Inclusion JS uniquement sur la page "Gestion des utilisateurs"
+    if ($hook === 'dgroots81_page_dgroots81-user-management') {
+        wp_enqueue_script(
+            'dgroots81-user-management',
+            plugin_dir_url(__FILE__) . 'user-management.js',
+            ['jquery'],
+            filemtime(plugin_dir_path(__FILE__) . 'user-management.js'),
+            true
+        );
+        $nonce = wp_create_nonce('supprimer_api_ose');
+        wp_localize_script('dgroots81-user-management', 'dgroots81AdminData', [
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce'   => $nonce,
+        ]);
+    }
+add_action('wp_ajax_supprimer_api_ose', 'dgroots81_handle_supprimer_api');
+});
 /**
  * Affiche la page "Gestion des utilisateurs" pour le plugin dgroots81.
  */
@@ -291,9 +284,12 @@ function dgroots81_user_management_page() {
             }
 
             // Pré-remplissage et génération à l'ouverture de la modale
+            // Variable pour mémoriser le bouton "Inscrire à l'API" cliqué
+            let lastInscrireBtnClicked = null;
             inscrireBtns.forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
+                    lastInscrireBtnClicked = btn; // Mémoriser le bouton cliqué
                     // Pré-remplir username/email avec les data-attributes du bouton cliqué (utilisateur de la ligne)
                     usernameInput.value = btn.dataset.username || '';
                     emailInput.value = btn.dataset.email || '';
@@ -362,6 +358,36 @@ function dgroots81_user_management_page() {
                     if (data.success) {
                         messageDiv.textContent = data.message || 'Inscription réussie.';
                         messageDiv.style.color = 'green';
+
+                        // Désactiver le bouton "Inscrire à l'API" et activer "Supprimer" sur la même ligne
+                        if (lastInscrireBtnClicked) {
+                            lastInscrireBtnClicked.disabled = true;
+                            const row = lastInscrireBtnClicked.closest('tr');
+                            if (row) {
+                                // Chercher le bouton "Delete" désactivé (sans classe supprimer-api-btn)
+                                const deleteBtnDisabled = Array.from(row.querySelectorAll('button.button-danger')).find(
+                                    b => !b.classList.contains('supprimer-api-btn') && b.disabled
+                                );
+                                // Remplacer le bouton désactivé par un bouton actif avec la classe supprimer-api-btn
+                                if (deleteBtnDisabled) {
+                                    const newDeleteBtn = document.createElement('button');
+                                    newDeleteBtn.className = 'button button-danger supprimer-api-btn';
+                                    newDeleteBtn.textContent = 'Delete';
+                                    newDeleteBtn.disabled = false;
+                                    newDeleteBtn.setAttribute('data-user-id', lastInscrireBtnClicked.dataset.userId);
+                                    newDeleteBtn.setAttribute('data-username', lastInscrireBtnClicked.dataset.username);
+                                    newDeleteBtn.setAttribute('data-email', lastInscrireBtnClicked.dataset.email);
+                                    deleteBtnDisabled.replaceWith(newDeleteBtn);
+                                } else {
+                                    // Sinon, activer le bouton existant s'il existe
+                                    let deleteBtn = row.querySelector('.supprimer-api-btn');
+                                    if (deleteBtn) {
+                                        deleteBtn.disabled = false;
+                                    }
+                                }
+                            }
+                        }
+
                         setTimeout(closeModal, 1800);
                     } else {
                         messageDiv.textContent = data.message || 'Erreur lors de l\'inscription.';
@@ -462,6 +488,15 @@ function dgroots81_handle_inscrire_api() {
         $data = json_decode($body, true);
     
         if ($code === 200 && isset($data['username'])) {
+            // Enregistrement de l'ID OSE dans les meta utilisateur WordPress
+            $wp_user = get_user_by('email', $email);
+            if ($wp_user && isset($data['id'])) {
+                update_user_meta($wp_user->ID, 'ose_user_id', $data['id']);
+                error_log('[OSE REGISTER] Utilisateur WP #' . $wp_user->ID . ' (' . $username . ') inscrit à l\'API OSE avec id=' . $data['id']);
+            } else {
+                error_log('[OSE REGISTER] Utilisateur WP non trouvé ou id OSE absent. username=' . $username . ', email=' . $email . ', id OSE=' . (isset($data['id']) ? $data['id'] : 'null'));
+            }
+
             // Envoi de l'email récapitulatif à l'utilisateur
             $to = $email;
             $subject = 'Votre accès API – Identifiants';
@@ -492,7 +527,13 @@ function dgroots81_handle_supprimer_api() {
     }
 
     // Vérification du nonce AJAX pour la sécurité
-    check_ajax_referer('supprimer_api_ose');
+    if (!isset($_POST['_ajax_nonce'])) {
+        wp_send_json(['success' => false, 'message' => 'Nonce absent dans la requête AJAX.']);
+    }
+    $nonce_valid = wp_verify_nonce($_POST['_ajax_nonce'], 'supprimer_api_ose');
+    if (!$nonce_valid) {
+        wp_send_json(['success' => false, 'message' => 'Nonce invalide ou expiré.']);
+    }
 
     $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
     if (!$user_id) {
@@ -502,12 +543,13 @@ function dgroots81_handle_supprimer_api() {
     // Récupérer l’ID OSE associé (stocké en meta user, ex : ose_user_id)
     $ose_user_id = get_user_meta($user_id, 'ose_user_id', true);
     if (!$ose_user_id) {
+        error_log('[OSE DELETE] Suppression échouée : Aucun ID OSE associé à l\'utilisateur WP #' . $user_id);
         wp_send_json(['success' => false, 'message' => 'Aucun ID OSE associé à cet utilisateur.']);
     }
 
     // Appeler l’API OSE pour suppression
     $base_url = rtrim(get_option('dgroots81_ose_server_base_api_url'), '/');
-    $users_url = $base_url . '/api/users/' . urlencode($ose_user_id) . '/';
+    $users_url = rtrim($base_url, '/') . '/api/users/' . urlencode($ose_user_id);
     $admin_token = get_option('dgroots81_ose_server_admin_token', '');
 
     $headers = [
@@ -518,6 +560,8 @@ function dgroots81_handle_supprimer_api() {
         $headers['Authorization'] = 'Bearer ' . $admin_token;
     }
 
+    error_log('[OSE DELETE] Tentative suppression utilisateur WP #' . $user_id . ' (OSE id=' . $ose_user_id . ') via ' . $users_url);
+
     $response = wp_remote_request($users_url, [
         'method' => 'DELETE',
         'headers' => $headers,
@@ -525,6 +569,7 @@ function dgroots81_handle_supprimer_api() {
     ]);
 
     if (is_wp_error($response)) {
+        error_log('[OSE DELETE] Erreur de connexion à l’API distante : ' . $response->get_error_message());
         wp_send_json(['success' => false, 'message' => 'Erreur de connexion à l’API distante : ' . $response->get_error_message()]);
     }
 
@@ -532,13 +577,18 @@ function dgroots81_handle_supprimer_api() {
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
 
+    error_log('[OSE DELETE] Réponse HTTP=' . $code . ' pour utilisateur WP #' . $user_id . ' (OSE id=' . $ose_user_id . ')');
+
     if ($code === 204) {
+        error_log('[OSE DELETE] Suppression réussie pour utilisateur WP #' . $user_id . ' (OSE id=' . $ose_user_id . ')');
         // Suppression côté OSE réussie, on NE supprime PAS l’utilisateur WordPress
         wp_send_json(['success' => true, 'message' => 'Utilisateur supprimé côté OSE.']);
     } elseif ($code === 404) {
+        error_log('[OSE DELETE] Utilisateur OSE introuvable pour WP #' . $user_id . ' (OSE id=' . $ose_user_id . ')');
         wp_send_json(['success' => false, 'message' => 'Utilisateur OSE introuvable.']);
     } else {
         $msg = isset($data['message']) ? $data['message'] : $body;
+        error_log('[OSE DELETE] Erreur API OSE : ' . $msg);
         wp_send_json(['success' => false, 'message' => 'Erreur API OSE : ' . esc_html($msg)]);
     }
 }

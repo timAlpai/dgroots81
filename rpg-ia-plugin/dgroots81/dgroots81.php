@@ -18,6 +18,14 @@ add_action('plugins_loaded', function() {
         dirname(plugin_basename(__FILE__)) . '/languages/'
     );
 });
+// Ajout d’un intervalle cron personnalisé (30 minutes)
+add_filter('cron_schedules', function($schedules) {
+    $schedules['dgroots81_every_15min'] = array(
+        'interval' => 15 * 60, // 15 minutes en secondes
+        'display'  => __('Toutes les 15 minutes', 'dgroots81')
+    );
+    return $schedules;
+});
 
 // Flush des permaliens à l’activation du plugin pour enregistrer l’endpoint WooCommerce
 register_activation_hook(__FILE__, function() {
@@ -31,8 +39,123 @@ if (is_admin()) {
 
 }
 
+add_action('wp_ajax_supprimer_api_ose', 'dgroots81_handle_supprimer_api');
+
 // Chargement des fichiers publics (WooCommerce)
+// Chargement du dashboard WooCommerce
 require_once plugin_dir_path(__FILE__) . 'public/woocommerce-dashboard.php';
+
+// --- Authentification automatique et Cron pour le token admin API OSE ---
+
+/**
+ * Tente de rafraîchir le token admin OSE si absent ou invalide.
+ * Appelée à chaque chargement du plugin et par le cron.
+ */
+function dgroots81_refresh_admin_api_token() {
+    $now = date('Y-m-d H:i:s');
+    error_log("[$now] [dgroots81] Entrée dans dgroots81_refresh_admin_api_token");
+
+    $api_base_url = get_option('dgroots81_ose_server_base_api_url', '');
+    $username = get_option('admin_api_username', '');
+    $password = get_option('admin_api_password', '');
+
+    if (!$api_base_url || !$username || !$password) {
+        error_log("[$now] [dgroots81] Config incomplète : base_url=[$api_base_url], username=[$username], password=" . ($password ? '[OK]' : '[VIDE]'));
+        return; // Config incomplète
+    }
+
+    // Vérifier si le token existe déjà et s'il est expiré
+    $token = get_option('dgroots81_ose_server_admin_token', '');
+    $token_expiry = get_option('dgroots81_ose_server_admin_token_expiry', 0);
+    $current_time = time();
+
+    if (!empty($token) && strlen($token) >= 16 && $token_expiry > $current_time) {
+        $expire_str = date('Y-m-d H:i:s', $token_expiry);
+        error_log("[$now] [dgroots81] Token déjà présent, semble valide et non expiré (".strlen($token)." caractères, expire à $expire_str). Pas de refresh nécessaire.");
+        return;
+    } elseif (!empty($token) && strlen($token) >= 16 && $token_expiry <= $current_time) {
+        $expire_str = date('Y-m-d H:i:s', $token_expiry);
+        error_log("[$now] [dgroots81] Token présent mais expiré (expire à $expire_str, maintenant $now). Rafraîchissement nécessaire.");
+    } else {
+        error_log("[$now] [dgroots81] Token absent ou trop court (".strlen($token)." caractères). Tentative de récupération d'un nouveau token...");
+    }
+
+    $endpoint = rtrim($api_base_url, '/') . '/api/auth/token';
+    $body = http_build_query([
+        'username' => $username,
+        'password' => $password
+    ]);
+    $args = [
+        'headers' => [
+            'Content-Type' => 'application/x-www-form-urlencoded'
+        ],
+        'body' => $body,
+        'timeout' => 15
+    ];
+    $response = wp_remote_post($endpoint, $args);
+
+    if (is_wp_error($response)) {
+        error_log("[$now] [dgroots81] Erreur lors de l'appel API : " . $response->get_error_message());
+        return;
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $resp_body = wp_remote_retrieve_body($response);
+    error_log("[$now] [dgroots81] Réponse API code=$code, body=$resp_body");
+
+    $json = json_decode($resp_body, true);
+    if ($code >= 200 && $code < 300 && !empty($json['access_token'])) {
+        update_option('dgroots81_ose_server_admin_token', $json['access_token']);
+        // Gestion du TTL/expiration
+        $ttl_api = 3600; // Par défaut 1h si non précisé
+        if (!empty($json['expires_in'])) {
+            $ttl_api = intval($json['expires_in']);
+        } elseif (!empty($json['ttl'])) {
+            $ttl_api = intval($json['ttl']);
+        }
+        $ttl = min($ttl_api, 1800); // Jamais plus de 30min
+        $expiry = time() + $ttl - 30; // marge de sécurité de 30s
+        update_option('dgroots81_ose_server_admin_token_expiry', $expiry);
+        $expire_str = date('Y-m-d H:i:s', $expiry);
+        error_log("[$now] [dgroots81] Nouveau token reçu et enregistré (" . strlen($json['access_token']) . " caractères, expire à $expire_str, TTL réel=$ttl_api s, TTL appliqué=$ttl s).");
+    } else {
+        error_log("[$now] [dgroots81] Échec récupération token : code=$code, access_token=" . (isset($json['access_token']) ? '[PRÉSENT]' : '[ABSENT]'));
+    }
+}
+
+// Hook : à chaque chargement du plugin (admin et public)
+add_action('plugins_loaded', 'dgroots81_refresh_admin_api_token');
+
+// Cron WordPress : vérification régulière du token admin
+/* Nettoyage de l’ancien cron hourly si existant */
+$timestamp = wp_next_scheduled('dgroots81_cron_check_admin_token');
+if ($timestamp) {
+    $cron = _get_cron_array();
+    if (isset($cron[$timestamp]['dgroots81_cron_check_admin_token'])) {
+        // Si l’ancien cron est en hourly, on le déprogramme
+        $event = $cron[$timestamp]['dgroots81_cron_check_admin_token'][0] ?? [];
+        if (isset($event['schedule']) && $event['schedule'] === 'hourly') {
+            wp_clear_scheduled_hook('dgroots81_cron_check_admin_token');
+        }
+    }
+}
+// Programmation sur l’intervalle personnalisé (30min)
+/* Nettoyage de l’ancien cron 30min si existant */
+$timestamp = wp_next_scheduled('dgroots81_cron_check_admin_token');
+if ($timestamp) {
+    $cron = _get_cron_array();
+    if (isset($cron[$timestamp]['dgroots81_cron_check_admin_token'])) {
+        $event = $cron[$timestamp]['dgroots81_cron_check_admin_token'][0] ?? [];
+        if (isset($event['schedule']) && $event['schedule'] === 'dgroots81_every_30min') {
+            wp_clear_scheduled_hook('dgroots81_cron_check_admin_token');
+        }
+    }
+}
+// Programmation sur l’intervalle personnalisé (15min)
+if (!wp_next_scheduled('dgroots81_cron_check_admin_token')) {
+    wp_schedule_event(time(), 'dgroots81_every_15min', 'dgroots81_cron_check_admin_token');
+}
+add_action('dgroots81_cron_check_admin_token', 'dgroots81_refresh_admin_api_token');
 // Ajout de la classe body "dgroots81-user-profile" uniquement sur la page profil utilisateur (endpoint WooCommerce dgroots81)
 add_filter('body_class', function($classes) {
     if (function_exists('is_account_page') && function_exists('is_wc_endpoint_url')) {
@@ -41,12 +164,16 @@ add_filter('body_class', function($classes) {
         }
 // Ajout des menus admin du plugin
 add_action('admin_menu', 'dgroots81_add_admin_menu');
-// Hook AJAX admin pour suppression utilisateur via OSE
+
+// Inclusion du JS admin pour la gestion des utilisateurs
+
+
 
     }
     return $classes;
 });
-add_action('wp_ajax_supprimer_api_ose', 'dgroots81_handle_supprimer_api');
+
+
 // Endpoint AJAX pour tester /health de l’API distante
 add_action('wp_ajax_test_api_health', function() {
     // Lire la baseurl depuis les options
