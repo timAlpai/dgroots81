@@ -1,0 +1,263 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: dgroots81 0.1A\n"
+"Language: fr_FR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: public/woocommerce-dashboard.php:13
+msgid "dgroots81"
+msgstr "dgroots81"
+
+#: public/woocommerce-dashboard.php:33
+msgid "Profile dgroots81"
+msgstr "Profile dgroots81"
+
+#: public/woocommerce-dashboard.php:34
+msgid "Bienvenue dans votre espace dgroots81"
+msgstr "Bienvenue dans votre espace dgroots81"
+
+#: admin/options-page.php:11
+msgid "dgroots81 Options"
+msgstr "Options dgroots81"
+
+#: admin/options-page.php:24
+msgid "dgroots81 Plugin Options"
+msgstr "Options du plugin dgroots81"
+
+#: admin/options-page.php:43
+msgid "Main Settings"
+msgstr "Paramètres principaux"
+
+msgid "OSE server base api url"
+msgstr "URL de base de l’API serveur OSE"
+
+#: admin/options-page.php
+msgid "Tests API"
+msgstr "Tests API"
+
+msgid "Tester /health"
+msgstr "Tester /health"
+
+msgid "Test en cours..."
+msgstr "Test en cours..."
+
+msgid "Succès :"
+msgstr "Succès :"
+
+msgid "Réponse :"
+msgstr "Réponse :"
+
+msgid "Erreur HTTP :"
+msgstr "Erreur HTTP :"
+
+msgid "Erreur inattendue :"
+msgstr "Erreur inattendue :"
+
+msgid "Erreur réseau ou serveur AJAX inaccessible."
+msgstr "Erreur réseau ou serveur AJAX inaccessible."
+
+#: i18n-missing
+msgid "API connection successful."
+msgstr "Connexion à l’API réussie."
+
+#: i18n-missing
+msgid "API authentication failed."
+msgstr "Échec de l’authentification à l’API."
+
+#: i18n-missing
+msgid "API Login"
+msgstr "Connexion à l’API"
+
+#: i18n-missing
+msgid "Username"
+msgstr "Nom d’utilisateur"
+
+#: i18n-missing
+msgid "Password"
+msgstr "Mot de passe"
+
+#: i18n-missing
+msgid "Log in"
+msgstr "Se connecter"
+
+#: i18n-missing
+msgid "Server connected OK"
+msgstr "Connexion au serveur réussie"
+
+#: i18n-missing
+msgid "User management"
+msgstr "Gestion des utilisateurs"
+
+#: i18n-missing
+msgid "API admin account creation"
+msgstr "Création du compte administrateur API"
+
+#: i18n-missing
+msgid "Security failed. Please try again."
+msgstr "Échec de la sécurité. Veuillez réessayer."
+
+#: i18n-missing
+msgid "Please fill in all fields."
+msgstr "Veuillez remplir tous les champs."
+
+#: i18n-missing
+msgid "API URL not configured."
+msgstr "URL de l’API non configurée."
+
+#: i18n-missing
+msgid "API connection error:"
+msgstr "Erreur de connexion à l’API :"
+
+#: i18n-missing
+msgid "API admin account successfully created/updated."
+msgstr "Compte administrateur API créé/mis à jour avec succès."
+
+#: i18n-missing
+msgid "API error:"
+msgstr "Erreur API :"
+
+#: i18n-missing
+msgid "https://api.example.com"
+msgstr "https://api.example.com"
+
+#: i18n-missing
+msgid "ID"
+msgstr "ID"
+
+#: i18n-missing
+msgid "Name"
+msgstr "Nom"
+
+#: i18n-missing
+msgid "Email"
+msgstr "E-mail"
+
+#: i18n-missing
+msgid "Role"
+msgstr "Rôle"
+
+#: i18n-missing
+msgid "Actions"
+msgstr "Actions"
+
+#: i18n-missing
+msgid "Register to API"
+msgstr "S’inscrire à l’API"
+
+#: i18n-missing
+msgid "Ban"
+msgstr "Bannir"
+
+#: i18n-missing
+msgid "Delete"
+msgstr "Supprimer"
+
+#: i18n-missing
+msgid "API Registration"
+msgstr "Inscription à l’API"
+
+#: i18n-missing
+msgid "Show password"
+msgstr "Afficher le mot de passe"
+
+#: i18n-missing
+msgid "Active (is_active)"
+msgstr "Actif (is_active)"
+
+#: i18n-missing
+msgid "Superuser (is_superuser)"
+msgstr "Superutilisateur (is_superuser)"
+
+#: i18n-missing
+msgid "Cancel"
+msgstr "Annuler"
+
+#: i18n-missing
+msgid "Submit"
+msgstr "Valider"
+
+#: i18n-missing
+msgid "Login"
+msgstr "Connexion"
+
+#: i18n-missing
+msgid "Logging in..."
+msgstr "Connexion en cours..."
+
+#: i18n-missing
+msgid "Success:"
+msgstr "Succès :"
+
+#: i18n-missing
+msgid "Error:"
+msgstr "Erreur :"
+
+#: i18n-missing
+msgid "Unexpected error"
+msgstr "Erreur inattendue"
+
+#: i18n-missing
+msgid "Create / Edit API admin"
+msgstr "Créer / Modifier l’administrateur API"
+
+#: i18n-missing
+msgid "Network error or AJAX server unreachable."
+msgstr "Erreur réseau ou serveur AJAX inaccessible."
+
+#: public/woocommerce-dashboard.php
+msgid "Profil"
+msgstr "Profil"
+
+#: public/woocommerce-dashboard.php
+msgid "Joueur"
+msgstr "Joueur"
+
+#: public/woocommerce-dashboard.php
+msgid "Profil utilisateur"
+msgstr "Profil utilisateur"
+
+msgid "Nom d’utilisateur"
+msgstr "Nom d’utilisateur"
+
+msgid "Date d’inscription"
+msgstr "Date d’inscription"
+
+msgid "Statut"
+msgstr "Statut"
+
+msgid "Actif"
+msgstr "Actif"
+
+msgid "Inactif"
+msgstr "Inactif"
+
+msgid "Rôle"
+msgstr "Rôle"
+
+msgid "Superutilisateur"
+msgstr "Superutilisateur"
+
+msgid "Utilisateur standard"
+msgstr "Utilisateur standard"
+
+msgid "Nombre de sessions"
+msgstr "Nombre de sessions"
+
+msgid "Nombre de personnages"
+msgstr "Nombre de personnages"
+
+msgid "Temps total de jeu"
+msgstr "Temps total de jeu"
+
+msgid "Classe favorite"
+msgstr "Classe favorite"
+
+msgid "Total d’actions"
+msgstr "Total d’actions"
+
+msgid "Aucune"
+msgstr "Aucune"
+
+msgid "Non renseigné"
+msgstr "Non renseigné"

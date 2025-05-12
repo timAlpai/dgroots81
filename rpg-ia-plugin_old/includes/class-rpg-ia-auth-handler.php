@@ -329,6 +329,11 @@ class RPG_IA_Auth_Handler {
         // Récupérer l'ID de l'utilisateur WordPress courant
         $wp_user_id = get_current_user_id();
         
+        // Vérifier si l'ID utilisateur est valide
+        if ($wp_user_id <= 0) {
+            return false; // Aucun utilisateur WordPress connecté
+        }
+        
         // Vérifier si un compte API est déjà associé à cet utilisateur WordPress
         $api_username = get_user_meta($wp_user_id, 'rpg_ia_api_username', true);
         
@@ -359,15 +364,21 @@ class RPG_IA_Auth_Handler {
         // Récupérer l'ID de l'utilisateur WordPress courant
         $wp_user_id = get_current_user_id();
         
+        // Vérifier si l'ID utilisateur est valide
+        if ($wp_user_id <= 0) {
+            return false; // Aucun utilisateur WordPress connecté
+        }
+        
         // Vérifier si l'utilisateur a déjà un compte API associé
         if ($this->has_api_account() && !current_user_can('administrator')) {
             return false; // Un utilisateur non-admin ne peut avoir qu'un seul compte API
         }
         
         // Associer le compte API à l'utilisateur WordPress
-        update_user_meta($wp_user_id, 'rpg_ia_api_username', sanitize_text_field($api_username));
+        $result = update_user_meta($wp_user_id, 'rpg_ia_api_username', sanitize_text_field($api_username));
         
-        return true;
+        // Vérifier si la mise à jour a réussi
+        return ($result !== false);
     }
 
 }

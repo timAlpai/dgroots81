@@ -559,41 +559,43 @@ class RPG_IA_Public {
                 'message' => __('Username, email and password are required.', 'rpg-ia')
             ), 400);
         }
-        /*
-        // Vérifier si l'utilisateur existe déjà
-        if (username_exists($username)) {
+
+        // Vérifier que l'utilisateur WordPress est connecté
+        $wp_user_id = get_current_user_id();
+        if ($wp_user_id <= 0) {
             return new WP_REST_Response(array(
                 'success' => false,
-                'message' => __('Username already exists.', 'rpg-ia')
-            ), 400);
+                'message' => __('Vous devez être connecté à WordPress pour créer un compte API.', 'rpg-ia')
+            ), 401);
         }
-        
-        // Vérifier si l'email existe déjà
-        if (email_exists($email)) {
-            return new WP_REST_Response(array(
-                'success' => false,
-                'message' => __('Email already exists.', 'rpg-ia')
-            ), 400);
-        }
-        */
-        // Enregistrer l'utilisateur
+
+        // Enregistrer l'utilisateur via l'API
         $auth_handler = new RPG_IA_Auth_Handler();
         $response = $auth_handler->register($username, $email, $password);
-        
+
         if (is_wp_error($response)) {
             return new WP_REST_Response(array(
                 'success' => false,
                 'message' => $response->get_error_message()
             ), 400);
         }
-        
+
+        // Associer le compte API à l'utilisateur WordPress
+        $meta_result = update_user_meta($wp_user_id, 'rpg_ia_api_username', sanitize_text_field($username));
+        if (!$meta_result) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => __('Impossible d\'associer le compte API à l\'utilisateur WordPress.', 'rpg-ia')
+            ), 500);
+        }
+
         return new WP_REST_Response(array(
             'success' => true,
             'message' => __('Registration successful. You can now login.', 'rpg-ia'),
             'user' => $response
         ), 201);
-    }
     
+    }
     /**
      * Gère la requête REST pour récupérer les informations de l'utilisateur courant.
      *

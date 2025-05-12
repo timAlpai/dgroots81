@@ -69,4 +69,4 @@ function run_rpg_ia() {
     $plugin->run();
 }
 
-run_rpg_ia();
+run_rpg_ia();  
