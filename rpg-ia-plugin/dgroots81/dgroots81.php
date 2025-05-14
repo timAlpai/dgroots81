@@ -164,11 +164,6 @@ add_filter('body_class', function($classes) {
         }
 // Ajout des menus admin du plugin
 add_action('admin_menu', 'dgroots81_add_admin_menu');
-
-// Inclusion du JS admin pour la gestion des utilisateurs
-
-
-
     }
     return $classes;
 });
