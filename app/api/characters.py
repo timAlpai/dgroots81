@@ -16,7 +16,8 @@ from app.schemas.character import (
     CharacterUpdate,
     CharacterWithDetails
 )
-from app.utils.ose_rules import generate_character_stats
+from app.utils.ose.generation import generate_character_stats, StatGenMethod
+
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -117,8 +118,9 @@ async def create_character(
 @router.post("/generate", response_model=CharacterSchema)
 async def generate_character(
     name: str,
-    character_class: CharacterClass,
+    character_class: CharacterClass,    
     game_session_id: int,
+    method: StatGenMethod = StatGenMethod.CLASSIC,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -134,7 +136,7 @@ async def generate_character(
         )
     
     # Générer les statistiques du personnage
-    character_data = generate_character_stats(character_class)
+    character_data = generate_character_stats(character_class, method=method)
     
     # Créer le personnage
     db_character = Character(

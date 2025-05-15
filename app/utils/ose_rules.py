@@ -2,22 +2,15 @@
 Module implémentant les règles Old-School Essentials (OSE) pour le système de jeu de rôle.
 """
 
-import random
+from random import random, randint
 from typing import Dict, Any, List
 from app.models.character import CharacterClass
+from enum import Enum
+from app.utils.ose.saves import SAVE_THROWS
+from app.utils.ose.thac0 import THAC0_TABLE
+ 
+from app.utils.ose.dice import roll_dice
 
-def roll_dice(num_dice: int, dice_type: int) -> int:
-    """
-    Lance un nombre spécifié de dés d'un type donné.
-    
-    Args:
-        num_dice: Nombre de dés à lancer
-        dice_type: Type de dé (d4, d6, d8, d10, d12, d20, etc.)
-    
-    Returns:
-        Somme des résultats des dés
-    """
-    return sum(random.randint(1, dice_type) for _ in range(num_dice))
 
 def roll_ability_score() -> int:
     """
@@ -256,71 +249,9 @@ def get_starting_skills(character_class: CharacterClass) -> List[Dict[str, Any]]
     else:
         return []
 
-def generate_character_stats(character_class: CharacterClass) -> Dict[str, Any]:
-    """
-    Génère les statistiques complètes pour un nouveau personnage.
-    
-    Args:
-        character_class: Classe du personnage
-    
-    Returns:
-        Dictionnaire contenant toutes les statistiques du personnage
-    """
-    # Générer les caractéristiques
-    strength = roll_ability_score()
-    intelligence = roll_ability_score()
-    wisdom = roll_ability_score()
-    dexterity = roll_ability_score()
-    constitution = roll_ability_score()
-    charisma = roll_ability_score()
-    
-    # Obtenir le type de dé de vie
-    hit_dice = get_hit_dice(character_class)
-    
-    # Calculer les points de vie (avec modificateur de constitution)
-    con_mod = get_ability_modifier(constitution)
-    max_hp = max(1, roll_dice(hit_dice["num"], hit_dice["type"]) + con_mod)
-    
-    # Générer l'or de départ
-    gold = get_starting_gold(character_class)
-    
-    # Générer l'équipement de départ
-    equipment = get_starting_equipment(character_class)
-    
-    # Générer les sorts de départ
-    spells = get_starting_spells(character_class)
-    
-    # Générer les compétences de départ
-    skills = get_starting_skills(character_class)
-    
-    # Calculer la classe d'armure (CA de base 10)
-    armor_class = 10
-    
-    # Ajouter le bonus d'armure de l'équipement
-    for item in equipment:
-        if item.get("type") == "armor":
-            armor_class += item.get("ac_bonus", 0)
-        elif item.get("type") == "shield":
-            armor_class += item.get("ac_bonus", 0)
-    
-    # Ajouter le modificateur de dextérité
-    armor_class += get_ability_modifier(dexterity)
-    
-    return {
-        "strength": strength,
-        "intelligence": intelligence,
-        "wisdom": wisdom,
-        "dexterity": dexterity,
-        "constitution": constitution,
-        "charisma": charisma,
-        "max_hp": max_hp,
-        "current_hp": max_hp,
-        "armor_class": armor_class,
-        "gold": gold,
-        "equipment": equipment,
-        "spells": spells,
-        "skills": skills
-    }
+
+
+
 
 def calculate_hp_for_level_up(character_class: CharacterClass, constitution: int) -> int:
     """
@@ -371,3 +302,46 @@ def calculate_experience_for_level(level: int) -> int:
     }
     
     return xp_table.get(level, 0)
+
+
+def get_save_threshold(character_class: str, level: int, save_type: str) -> int:
+    """
+    Retourne le seuil OSE pour un jet de sauvegarde donné.
+    - character_class : nom de la classe ou race en majuscules (ex: 'GUERRIER', 'NAIN')
+    - level : niveau du personnage (limité au max défini)
+    - save_type : l’un des 5 types : 'MP', 'B', 'PP', 'S', 'SBB'
+    """
+    character_class = character_class.upper()
+    if character_class not in SAVE_THROWS:
+        raise ValueError(f"Classe ou race non reconnue : {character_class}")
+    if level < 1:
+        raise ValueError(f"Niveau invalide : {level}. Le niveau doit être ≥ 1.")
+
+    level_table = SAVE_THROWS[character_class]
+    capped_level = min(level, max(level_table.keys()))
+
+    seuils = level_table[capped_level]
+    if save_type not in seuils:
+        raise ValueError(f"Type de sauvegarde invalide : {save_type}")
+
+    return seuils[save_type]
+
+
+def jet_sauvegarde(character_class: str, level: int, save_type: str, modificateur: int = 0) -> dict:
+    """
+    Effectue un jet de sauvegarde OSE :
+    - tire 1d20,
+    - applique le modificateur,
+    - compare au seuil défini pour la classe/niveau/type.
+
+    Retourne un dict avec résultat complet.
+    """
+    seuil = get_save_threshold(character_class, level, save_type)
+    resultat = roll_dice(1, 20, modificateur)
+    return {
+        **resultat,
+        "seuil": seuil,
+        "réussi": resultat["total"] >= seuil
+    }
+
+ 

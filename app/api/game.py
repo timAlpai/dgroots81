@@ -1,8 +1,18 @@
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, conint
+from typing_extensions import Annotated
 from random import randint
 from typing import List, Literal, Optional
+from app.models.character import Character
+from app.utils.ose_rules import jet_sauvegarde as ose_jet_sauvegarde
 
+from app.utils.ose.combat import jet_attaque
+
+from app.utils.ose.dice import roll_dice
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends, HTTPException
+from app.core.database import get_db
 router = APIRouter(prefix="/game", tags=["Game"])
 
 class JetDesRequest(BaseModel):
@@ -14,8 +24,21 @@ class ModificateurRequest(BaseModel):
     modificateur: int = 0
 
 class SauvegardeRequest(BaseModel):
-    seuil: int
+    character_class: Literal[
+        "GUERRIER", "CLERC", "MAGICIEN", "VOLEUR",
+        "NAIN", "ELFE", "HALFELIN"
+    ]
+    level: int
+    level: Annotated[int, Field(ge=1, le=14)]
+    type: Literal["MP", "B", "PP", "S", "SBB"]
     modificateur: int = 0
+
+class AttaqueRequest(BaseModel):
+    character_class: Literal["GUERRIER", "CLERC", "MAGICIEN", "VOLEUR", "NAIN", "ELFE", "HALFELIN"]
+    level: Annotated[int, Field(ge=1, le=14)]
+    classe_armure: int  # La CA de la cible (positive ou négative)
+    modificateur: int = 0  # Bonus d'attaque, force, magie, etc.
+
 
 class CaracCheckRequest(BaseModel):
     seuil: int
@@ -25,10 +48,7 @@ class ChanceRequest(BaseModel):
     seuil: int = 1
 
 
-def roll_dice(nb: int, faces: int, mod: int = 0):
-    resultats = [randint(1, faces) for _ in range(nb)]
-    total = sum(resultats) + mod
-    return {"dés": resultats, "modificateur": mod, "total": total}
+
 
 @router.post("/jet-de")
 def jet_de(request: JetDesRequest):
@@ -36,23 +56,29 @@ def jet_de(request: JetDesRequest):
     return roll_dice(request.nombre, faces, request.modificateur)
 
 @router.post("/attaque")
-def jet_attaque(data: ModificateurRequest):
-    return roll_dice(1, 20, data.modificateur)
-
+def attaque(data: AttaqueRequest):
+    return jet_attaque(
+        character_class=data.character_class,
+        level=data.level,
+        classe_armure=data.classe_armure,
+        modificateur=data.modificateur
+    )
 @router.post("/initiative")
 def jet_initiative():
     return roll_dice(1, 6)
 
+
 @router.post("/sauvegarde")
 def jet_sauvegarde(data: SauvegardeRequest):
-    jet = randint(1, 20)
-    total = jet + data.modificateur
-    return {
-        "jet": jet,
-        "modificateur": data.modificateur,
-        "total": total,
-        "réussi": total >= data.seuil
-    }
+    return ose_jet_sauvegarde(
+        character_class=data.character_class,
+        level=data.level,
+        save_type=data.type,
+        modificateur=data.modificateur
+    )
+
+
+
 
 @router.post("/moral")
 def jet_moral(data: ModificateurRequest):
