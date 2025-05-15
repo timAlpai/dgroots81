@@ -57,16 +57,16 @@ def get_hit_dice(character_class: CharacterClass) -> Dict[str, int]:
         Dictionnaire contenant le nombre et le type de dés de vie
     """
     hit_dice = {
-        CharacterClass.CLERC: {"num": 1, "type": 6},
-        CharacterClass.GUERRIER: {"num": 1, "type": 8},
-        CharacterClass.MAGICIEN: {"num": 1, "type": 4},
-        CharacterClass.VOLEUR: {"num": 1, "type": 4},
-        CharacterClass.NAIN: {"num": 1, "type": 8},
-        CharacterClass.ELFE: {"num": 1, "type": 6},
-        CharacterClass.HALFELIN: {"num": 1, "type": 6}
+    "GUERRIER": {"num": 1,"type": 8, "max_level_dv": 9},
+    "CLERC": {"num": 1,"type": 6, "max_level_dv": 9},
+    "MAGICIEN": {"num": 1,"type": 4, "max_level_dv": 9},
+    "VOLEUR": {"num": 1,"type": 4, "max_level_dv": 9},
+    "NAIN": {"num": 1,"type": 8, "max_level_dv": 8},
+    "ELFE": {"num": 1,"type": 6, "max_level_dv": 10},
+    "HALFELIN": {"num": 1,"type": 6, "max_level_dv": 8},
     }
     
-    return hit_dice.get(character_class, {"num": 1, "type": 6})
+    return hit_dice.get(character_class, {"num": 1, "type": 6, "max_level_dv": 9})
 
 def get_starting_gold(character_class: CharacterClass) -> int:
     """
@@ -253,25 +253,7 @@ def get_starting_skills(character_class: CharacterClass) -> List[Dict[str, Any]]
 
 
 
-def calculate_hp_for_level_up(character_class: CharacterClass, constitution: int) -> int:
-    """
-    Calcule les points de vie gagnés lors d'une montée de niveau.
-    
-    Args:
-        character_class: Classe du personnage
-        constitution: Valeur de constitution du personnage
-    
-    Returns:
-        Nombre de points de vie gagnés
-    """
-    # Obtenir le type de dé de vie
-    hit_dice = get_hit_dice(character_class)
-    
-    # Calculer les points de vie (avec modificateur de constitution)
-    con_mod = get_ability_modifier(constitution)
-    hp_gain = max(1, roll_dice(hit_dice["num"], hit_dice["type"]) + con_mod)
-    
-    return hp_gain
+
 
 def calculate_experience_for_level(level: int) -> int:
     """

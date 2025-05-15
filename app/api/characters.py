@@ -17,7 +17,8 @@ from app.schemas.character import (
     CharacterWithDetails
 )
 from app.utils.ose.generation import generate_character_stats, StatGenMethod
-
+from app.utils.ose.hp import calculate_hp_for_level_up
+from app.utils.ose.core import get_max_level
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -249,31 +250,36 @@ async def delete_character(
     
     return None
 
+
+
 @router.post("/{character_id}/level-up", response_model=CharacterSchema)
 async def level_up_character(
     character_id: int,
     db: AsyncSession = Depends(get_db),
     character_and_is_gm: Tuple[Character, bool] = Depends(get_character)
 ):
-    """Augmente le niveau d'un personnage"""
+    """Augmente le niveau d'un personnage OU seulement ses PV s'il est au max"""
     character, is_game_master = character_and_is_gm
     
-    # Vérifier si l'utilisateur est le propriétaire du personnage ou le maître de jeu
+    # Vérifie permissions
     if not (character.user_id == character.user.id or is_game_master):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seul le propriétaire du personnage ou le maître de jeu peut augmenter son niveau"
         )
     
-    # Augmenter le niveau
-    character.level += 1
-    
-    # Calculer les nouveaux points de vie selon les règles OSE
-    from app.utils.ose_rules import calculate_hp_for_level_up
-    hp_increase = calculate_hp_for_level_up(character.character_class, character.constitution)
+    max_level = get_max_level(character.character_class)
+    is_level_up = character.level < max_level
+
+    # Monte de niveau si possible
+    if is_level_up:
+        character.level += 1
+
+    # Gagne des PV dans tous les cas
+    hp_increase = calculate_hp_for_level_up(character.character_class, character.level, character.constitution)
     character.max_hp += hp_increase
-    character.current_hp += hp_increase
-    
+    character.current_hp = character.max_hp
+
     await db.commit()
     await db.refresh(character)
     
