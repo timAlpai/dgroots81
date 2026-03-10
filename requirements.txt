@@ -17,7 +17,7 @@ redis==5.0.1
 python-jose==3.3.0
 passlib==1.7.4
 bcrypt==4.1.2
-python-multipart==0.0.9
+python-multipart==0.0.22
 
 # Client HTTP
 httpx==0.26.0
